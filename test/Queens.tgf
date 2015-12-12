@@ -1,0 +1,13 @@
+let
+  var N := 8
+
+  function printBoard() = 
+    (for i := 0 to N-1 do
+      (for j := 0 to N-1 do
+        print(if i = j then "EQUAL" else "NOT EQUAL");
+       print("\n"));
+     print("\n"))
+
+in
+  printBoard()
+end
