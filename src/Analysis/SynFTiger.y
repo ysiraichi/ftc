@@ -33,24 +33,31 @@
 program: expr
 
 expr   : lit
-       | '(' parExp ')'
        | arithm
+       | compare
        | logic
+       | let
        | if-then
-       | WHL expr DO expr
-       | FOR decl TO expr DO expr
-       | BRK
-       | LET decls IN parExp END
-       | ID '(' seqExp ')' 
+       | funCall
+       | parExp
 
-parExp : seqExp
-       | expr
+/* ------------------ let -------------------- */
+
+let    : LET decls IN expr END
+
+/* ------------- function call --------------- */
+
+funCall: ID '(' argExp ')'
+
+argExp : expr argExp2
+       | /* empty */
+argExp2: ',' expr argExp2
        | /* empty */
 
-/* ------------- sequential expr ------------- */
+/* ------------- parenthesis expr ------------ */
 
-seqExp : expr ';' expr seqExp2 
-seqExp2: ';' expr seqExp2
+parExp : '(' parExp2 ')'
+parExp2: expr
        | /* empty */
 
 /* ---------------- arithmetic --------------- */
@@ -60,15 +67,18 @@ arithm : expr PLS expr
        | expr MUL expr
        | expr DIV expr
 
-/* ------------------ logic ------------------ */
+/* --------------- comparison ---------------- */
 
-logic  : expr EQ expr 
+compare: expr EQ expr 
        | expr DIF expr 
        | expr LT expr 
        | expr LE expr 
        | expr GT expr 
        | expr GE expr 
-       | expr AND expr 
+
+/* ------------------ logic ------------------ */
+
+logic  : expr AND expr 
        | expr OR expr 
 
 /* --------------- if-then-else -------------- */
@@ -84,22 +94,26 @@ decl   : varDec
 decls  : decl decls
        | /* empty */
 
-funDec : FUN ID '(' params ')' funDec2
+idType : INTT
+       | FLTT
+       | STRT
+
+/* -= function declaration =- */
+
+funDec : FUN ID '(' argDec ')' funDec2
 funDec2: ':' idType EQ expr
        | EQ expr
 
-params : ID ':' idType params2
+argDec : ID ':' idType argDec2
        | /* empty */
-params2: ',' ID ':' idType params2
+argDec2: ',' ID ':' idType argDec2
        | /* empty */
+
+/* -= variable declaration =- */
 
 varDec : VAR ID varDec2
 varDec2: ':' idType ASGN expr
        | ASGN expr
-
-idType : INTT
-       | FLTT
-       | STRT
 
 /* ------------------ types ------------------ */
 
@@ -110,17 +124,17 @@ lit    : id
 id     : ID
        | '-' ID %prec UMIN
 
-numType: INT
-       | FLT
 num    : numType
        | '-' numType %prec UMIN
+numType: INT
+       | FLT
 
 /* ------------------------------------------- */
 
 %%
 
-void yyerror(void) {
-  printf("Syntax error.");
+void yyerror(const char *s) {
+  printf("Syntax error: %s.", s);
 }
 
 int main() {
