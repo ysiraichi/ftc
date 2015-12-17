@@ -1,7 +1,7 @@
 %{
 
-#include "Tokens.h"
-#include "UtilLex.h"
+#include "Analysis/UtilLex.h"
+#include "${BISON_Parser_OUTPUT_HEADER}"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -143,8 +143,6 @@ M                         {
 "float"                   { return FLTT; }
 "string"                  { return STRT; }
 
-"for"                     { return FOR;  }
-"to"                      { return TO;   }
 "break"                   { return BRK;  }
 "let"                     { return LET;  }
 "in"                      { return IN;   }
@@ -154,8 +152,6 @@ M                         {
 "if"                      { return IF;   }
 "then"                    { return THEN; }
 "else"                    { return ELSE; }
-"do"                      { return DO;   }
-"while"                   { return WHL;  }
 
 "/*"                      { yy_push_state(COMMENT); }
 <COMMENT>"*/"             { yy_pop_state(); }
@@ -185,6 +181,7 @@ M                         {
 
 %%
 
+/*
 int main(int argc, char **argv) {
   int n;
   if (argc > 1) {
@@ -196,3 +193,4 @@ int main(int argc, char **argv) {
   }
   return 0;
 }
+*/
