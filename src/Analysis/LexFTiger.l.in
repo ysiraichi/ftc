@@ -142,8 +142,11 @@ M                         {
 "int"                     { return INTT; }
 "float"                   { return FLTT; }
 "string"                  { return STRT; }
+"answer"                  { return ANST; }
+"cont"                    { return CNTT; }
+"stringConsumer"          { return STRCT; }
 
-"break"                   { return BRK;  }
+"type"                    { return TYPE; }
 "let"                     { return LET;  }
 "in"                      { return IN;   }
 "end"                     { return END;  }
@@ -152,10 +155,14 @@ M                         {
 "if"                      { return IF;   }
 "then"                    { return THEN; }
 "else"                    { return ELSE; }
+"array"                   { return ARRY; }
+"of"                      { return OF;   }
+"nil"                     { return NIL;  }
 
 "/*"                      { yy_push_state(COMMENT); }
 <COMMENT>"*/"             { yy_pop_state(); }
-<COMMENT>[^("*/")]
+<COMMENT>"/*"             { yy_push_state(COMMENT); }
+<COMMENT>([\n\r]|.)
 
 "+"                       { return PLS;   }
 "-"                       { return MIN;   }
@@ -171,7 +178,18 @@ M                         {
 "&"                       { return AND;   }
 "|"                       { return OR;    }
 
-[\(\);:,]                 { /* let it go */ }
+"->"                      { return INTO;  }
+
+"("                       { return LPAR;  }
+")"                       { return RPAR;  }
+"["                       { return LSQB;  }
+"]"                       { return RSQB;  }
+"{"                       { return LBRK;  }
+"}"                       { return RBRK;  }
+";"                       { return SMCL;  }
+":"                       { return COLL;  }
+","                       { return COMM;  }
+"."                       { return PT;    }
 
 [a-zA-Z]+[0-9a-zA-Z_]*    { return ID; }
 
