@@ -39,8 +39,8 @@ char *StringBuf;
 char *StringBufPtr;
 %}
 
-([1-9]+[0-9]*|"0")        { return INT; }
-[0-9]+"."[0-9]+           { return FLT; }
+([1-9]+[0-9]*|"0")        { yylval.Int = atoi(yytext); return INT; }
+[0-9]+"."[0-9]+           { yylval.Flt = atof(yytext); return FLT; }
 
 \"                        { 
                             yy_push_state(STRING);     
@@ -53,6 +53,7 @@ char *StringBufPtr;
 \"                        { 
                             yy_pop_state(); 
                             *StringBufPtr = '\0';
+                            yylval.Str = StringBuf;
                             return STR; 
                           }
 \\                        { yy_push_state(ESCAPE); }
@@ -204,7 +205,11 @@ M                         {
 ","                       { return COMM;  }
 "."                       { return PT;    }
 
-[a-zA-Z]+[0-9a-zA-Z_]*    { return ID; }
+[a-zA-Z]+[0-9a-zA-Z_]*    { 
+                            yylval.Str = (char*) malloc(yyleng);
+                            strcpy(yylval.Str, yytext);
+                            return ID; 
+                          }
 
 [\t ]                     { /* eat some spaces */ }
 [\n\r]                    { yycolumn = 1; }

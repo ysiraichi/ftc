@@ -14,6 +14,12 @@ static const char SynError[] = "SyntaticalError";
 
 %locations
 
+%union {
+  int Int;
+  float Flt;
+  char *Str;
+}
+
 %token INT FLT STR
 
 %token LET IN END FUN VAR IF THEN ELSE NIL ARRY OF TYPE
