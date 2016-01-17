@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static const char LexError[] = "LexicalError";
 %}
 
 %option stack
@@ -59,7 +61,7 @@ char *StringBufPtr;
                               &StringBufMax, yytext);
                           }
 [\n\r]                    { yycolumn = 1; }
-<<EOF>>                   { yyerror("LexicalError: String not terminated."); }
+<<EOF>>                   { yyerror("%s: String not terminated.", LexError); }
 }
 
 <ESCAPE>{
@@ -81,7 +83,7 @@ t                         {
                           } 
 \^                        { yy_push_state(CONTROL); }
 {NESC}                    {   
-                            yyerror("LexicalError: Escaped character '%s' not recognized.", yytext); 
+                            yyerror("%s: Escaped character '%s' not recognized.", LexError, yytext); 
                             yy_pop_state();
                           }
 }
@@ -142,7 +144,7 @@ M                         {
                             yy_pop_state();
                           }
 {NCTR}                    { 
-                            yyerror("LexicalError: Control character '%s' not recognized.", yytext); 
+                            yyerror("%s: Control character '%s' not recognized.", LexError, yytext); 
                             yy_pop_state();
                             yy_pop_state();
                           }
@@ -172,7 +174,7 @@ M                         {
 <COMMENT>"*/"             { yy_pop_state(); }
 <COMMENT>"/*"             { yy_push_state(COMMENT); }
 <COMMENT>[\n\r]           { yycolumn = 1; }
-<COMMENT><<EOF>>          { yyerror("LexicalError: Comment not terminated."); }
+<COMMENT><<EOF>>          { yyerror("%s: Comment not terminated."); }
 <COMMENT>.
 
 "+"                       { return PLS;   }
@@ -207,7 +209,7 @@ M                         {
 [\t ]                     { /* eat some spaces */ }
 [\n\r]                    { yycolumn = 1; }
 
-.                         { yyerror("LexicalError: Token '%s' not recognized.", yytext); }
+.                         { yyerror("%s: Token '%s' not recognized.", LexError, yytext); }
 
 %%
 

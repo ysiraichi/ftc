@@ -1,7 +1,11 @@
 %{
-  #include <stdio.h>
-  #include <stdarg.h>
-  int yylex(void);
+#include <stdio.h>
+#include <stdarg.h>
+
+int yylex(void);
+
+static const char LexError[] = "LexicalError";
+static const char SynError[] = "SyntaticalError";
 %}
 
 %code requires {
@@ -28,6 +32,7 @@
 %nonassoc ELSE
 
 %right INTO
+
 
 %nonassoc OF
 
@@ -61,12 +66,14 @@ expr   : lit
        | parExp
        | create
        | NIL
+       | error { printf("\t%s: Invalid expression.\n", SynError); YYABORT; }
 
 /* ----------- primitive types --------------- */
 
 lit    : INT
        | FLT
        | STR
+       | error PT INT { printf("\t%s: Invalid real expression.\n", SynError); YYABORT; }
 
 /* ----------------- l-value ----------------- */
 
@@ -113,6 +120,7 @@ decls  : decls decl
 decl   : varDec
        | funDec
        | tyDec
+       | error { printf("\t%s: Invalid declaration at 'Text'.\n", SynError); YYABORT; }
 
 idType : INTT
        | FLTT
@@ -124,14 +132,21 @@ idType : INTT
 
 argDec : ID COLL idType argDec2
        | /* empty */
-argDec2: argDec2 COMM ID COLL idType
+argDec2: argDec2 commErr ID COLL idType
        | /* empty */
+
+commErr: COMM
+       | error { printf("\t%s: Invalid argument declaration.\n", SynError); YYABORT; }
 
 /* -= variable declaration =- */
 
 varDec : VAR ID varDec2
-varDec2: COLL idType ASGN expr
-       | ASGN expr
+varDec2: COLL idType opErr expr 
+       | opErr expr 
+
+/* -= errors =- */
+opErr  : ASGN
+       | error { printf("\t%s: Expected ':=' at 'Text'.\n", SynError); YYABORT; }
 
 /* -= types declaration =- */
 
@@ -171,10 +186,9 @@ argExp2: argExp2 COMM expr
 
 /* ------------- parenthesis expr ------------ */
 
-parExp : LPAR parExp2 RPAR
-parExp2: expr
-       | /* empty */
-
+parExp : LPAR expr parExp2
+parExp2: RPAR
+       | error { printf("\t%s: Parenthesis missing.\n", SynError); YYABORT; }
 /* --------------- creation ------------------ */
 
 create : rCreat
@@ -191,7 +205,9 @@ rField2: rField2 COMM ID EQ expr
 
 /* -= array creation=- */
 
-aCreat : ID LSQB expr RSQB OF expr
+aCreat : ID LSQB limErr OF expr 
+limErr : expr RSQB 
+       | error { printf("\t%s: Invalid array initialization.\n", SynError); YYABORT; }
 
 /* ------------------------------------------- */
 
@@ -213,5 +229,5 @@ void yyerror(const char *s, ...) {
 int main(int argc, char **argv) {
   if (argc > 1) yyin = fopen(argv[1], "r");
   int parsing = yyparse();
-  printf("Parsing was: %d\n", parsing);
+  return parsing;
 }
