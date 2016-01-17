@@ -3,8 +3,6 @@
 
 typedef struct ExprT ExprT;
 typedef struct LitT LitT;
-typedef struct ArrayAccessT ArrayAccessT;
-typedef struct RecordAccessT RecordAccessT;
 typedef struct LvalT LvalT;
 typedef struct BinOpT BinOpT;
 typedef struct LetT LetT;
@@ -15,6 +13,7 @@ typedef struct VarDeclT VarDeclT;
 typedef struct FunDeclT FunDeclT;
 typedef struct ArrayT ArrayT;
 typedef struct FunTyT FunTyT;
+typedef struct SeqTyT SeqTyT;
 typedef struct TyDeclT TyDeclT;
 typedef struct IfStmtT IfStmtT;
 typedef struct FunCallT FunCallT;
@@ -23,6 +22,35 @@ typedef struct CreateT CreateT;
 typedef struct ArrayTyT ArrayTyT;
 typedef struct RecordT RecordT;
 typedef struct FieldT FieldT;
+
+typedef enum { Lit, Lval, BinOp, Let, IfStmt, FunCall, Create } ExprKind;
+typedef enum { Int, Float, String, Name, ParamTy, FunTy, ArrayTy } TypeKind;
+typedef enum { Id, RecordAccess, ArrayAccess } LvalKind;
+typedef enum { Sum, Sub, Mult, Div, Eq, Diff, Lt, Le, Gt, Ge, And, Or } OpKind;
+typedef enum { Var, Fun, Ty } DeclKind;
+typedef enum { Array, Record } CreateKind;
+
+ExprT    *createExpr(ExprKind, void*);
+LitT     *createLit(TypeKind, void*);
+LvalT    *createLval(LvalKind, char*, LvalT*, ExprT*);
+BinOpT   *createBinOp(OpKind, ExprT*, ExprT*);
+LetT     *createLet(DeclT*, ExprT*);
+DeclT    *createDecl(DeclKind, void*, DeclT*);
+TypeT    *createType(TypeKind, void*);
+ParamTyT *createParamTy(char*, ParamTyT*);
+VarDeclT *createVarDecl(char*, ExprT*);
+FunDeclT *createFunDecl(char*, ExprT*, ParamTyT*, FunDeclT *FNext);
+TyDeclT  *createTyDecl(char*, TypeT*);
+ArrayTyT *createArrayTy(TypeT*);
+SeqTyT   *createSeqTy(TypeT*, SeqTyT*);
+FunTyT   *createFunTy(SeqTyT*, SeqTyT*);
+IfStmtT  *createIfStmt(ExprT*, ExprT*, ExprT*);
+ArgT     *createArg(ExprT*, ArgT*);
+FunCallT *createFunCall(char*, ArgT*);
+CreateT  *createCreate(CreateKind, void*);
+ArrayT   *createArray(char*, ExprT*, ExprT*);
+RecordT  *createRecord(char*, FieldT*);
+FieldT   *createField(char*, ExprT*, FieldT*);
 
 // -----------------------------------------------= Function Call
 struct FieldT {
@@ -46,9 +74,7 @@ struct ArrayT {
 };
 
 struct CreateT {
-  enum {
-    Record, Array 
-  } Idx;
+  CreateKind Kind;
   union {
     RecordT *Record;
     ArrayT  *Array;
@@ -85,36 +111,33 @@ struct ParamTyT {
 };
 
 struct TypeT {
-  enum { 
-    Preset, Custom 
-  } Idx;
+  TypeKind Kind;
   union {
-    int  Type;
-    char *Id;
-  } Value;
+    char     *Id;
+    FunTyT   *FunTy;
+    ParamTyT *ParamTy;
+    ArrayTyT *ArrayTy;
+  } Ty;
 };
 
 // >> Type Declaration
 struct TyDeclT {
   char *Id;
-  enum {
-    Type, ParamTy, FunTy, ArrayTy
-  } Idx;
-  union {
-    TypeT    *Type;
-    ParamTyT   *Params;
-    FunTyT   *Func;
-    ArrayTyT *ArrayTy;
-  } Ty;
+  TypeT *Type;
+};
+
+struct SeqTyT {
+  TypeT *Type;
+  SeqTyT *Next;
 };
 
 struct FunTyT {
-  TyDeclT *From;
-  TyDeclT *To;
+  SeqTyT *From;
+  SeqTyT *To;
 };
 
 struct ArrayTyT {
-  TypeT Type;
+  TypeT *Type;
 };
 
 // >> Function Declaration
@@ -135,13 +158,11 @@ struct VarDeclT {
 
 // >> Declaration
 struct DeclT {
-  enum {
-    Var, Fun, Ty
-  } Idx;
+  DeclKind Kind;
   union {
     VarDeclT *Var;
     FunDeclT *Fun;
-    TyDeclT  *Type;
+    TyDeclT  *Ty;
   } Value;
   DeclT *Next;
 };
@@ -156,53 +177,33 @@ struct LetT {
 // -----------------------------------------------= Binary Operations
 struct BinOpT {
   TypeT *Type;
-  enum {
-    Sum, Sub, Mult, Div
-  } Idx;
+  OpKind Kind;
   ExprT *ExprOne;
   ExprT *ExprTwo;
 };
 
 // -----------------------------------------------= L-Values
 struct LvalT {
-  enum {
-    Id, RecordAccess, ArrayAccess
-  } Idx;
-  union {
-    char *Id; 
-    RecordAccessT *Rec;
-    ArrayAccessT  *Array;
-  } Value;
-};
-
-struct RecordAccessT {
+  LvalKind Kind;
+  char *Id;
   LvalT *Lval;
-  char  *Id;
-};
-
-struct ArrayAccessT {
-  LvalT *Lval;
-  ExprT *Expr;
+  ExprT *Pos;
 };
 
 // -----------------------------------------------= Literals
 struct LitT {
-  enum { 
-    Int, Float, String
-  } Idx;
+  TypeKind Kind;
   union {
     int    Int;
-    float  Flt;
-    char  *Str;
+    float  Float;
+    char  *String;
   } Value;
 };
 
 // -----------------------------------------------= Expression
 struct ExprT {
   TypeT *Type;
-  enum {
-    Lit, Lval, BinOp, Let, IfStmt, FunCall, Create
-  } Idx;
+  ExprKind Kind; 
   union {
     LitT     *Lit;
     LvalT    *Lval;
