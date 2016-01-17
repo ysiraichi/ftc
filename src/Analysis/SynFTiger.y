@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "ftc/Analysis/ParserTree.h"
+
 int yylex(void);
 
 static const char LexError[] = "LexicalError";
@@ -16,11 +18,14 @@ static const char SynError[] = "SyntaticalError";
 
 %union {
   int Int;
-  float Flt;
-  char *Str;
+  float Float;
+  char *String;
+  void *Node;
 }
 
-%token INT FLT STR
+%token <Int> INT 
+%token <Float> FLT 
+%token <String> STR ID
 
 %token LET IN END FUN VAR IF THEN ELSE NIL ARRY OF TYPE
 %token PLS MIN DIV MUL ASGN EQ DIF LT LE GT GE AND OR
@@ -28,24 +33,23 @@ static const char SynError[] = "SyntaticalError";
 %token LPAR RPAR LSQB RSQB LBRK RBRK COLL COMM PT SMCL
 
 %token INTO
-%token ID
 %token INTT FLTT STRT ANST CNTT STRCT
 
-%token LVAL
-%token UMIN
-
-%nonassoc THEN
-%nonassoc ELSE
+%precedence THEN
+%precedence ELSE
 
 %right INTO
 
 
-%nonassoc OF
+%precedence OF
 
-%nonassoc LVAL
-%nonassoc LSQB
+%precedence LVAL
+%precedence LSQB
 
-%nonassoc FEQ
+%precedence FEQ
+
+%precedence DECL
+%precedence FUN
 
 %left OR
 %left AND
@@ -54,6 +58,14 @@ static const char SynError[] = "SyntaticalError";
 %left DIV MUL
 %right UMIN
 
+%type <Node> expr 
+
+/* expr */
+%type <Node> lit lVal 
+
+/* lval */
+%type <Node> record array
+
 %start program
 
 %%
@@ -61,36 +73,36 @@ static const char SynError[] = "SyntaticalError";
 program: expr
        | /* empty */
 
-expr   : lit
-       | lVal
-       | arithm
-       | compare
-       | logic
-       | let
-       | if-then
-       | funCall
-       | parExp
-       | create
-       | NIL
+expr   : lit                      { $$ = NULL; }
+       | lVal                     { $$ = NULL; }
+       | arithm                   { $$ = NULL; }
+       | unary                    { $$ = NULL; }
+       | compare                  { $$ = NULL; }
+       | logic                    { $$ = NULL; }
+       | let                      { $$ = NULL; }
+       | if-then                  { $$ = NULL; }
+       | funCall                  { $$ = NULL; }
+       | parExp                   { $$ = NULL; }
+       | create                   { $$ = NULL; }
+       | NIL                      { $$ = NULL; }
        | error { printf("\t%s: Invalid expression.\n", SynError); YYABORT; }
 
 /* ----------- primitive types --------------- */
 
-lit    : INT
-       | FLT
-       | STR
+lit    : INT                      { $$ = (void*) createLit(Int, &($1)); }
+       | FLT                      { $$ = (void*) createLit(Float, &($1)); }
+       | STR                      { $$ = (void*) createLit(String, $1); }
        | error PT INT { printf("\t%s: Invalid real expression.\n", SynError); YYABORT; }
 
 /* ----------------- l-value ----------------- */
 
-lVal   : record
-       | array
-       | ID %prec LVAL
+lVal   : record                   { $$ = $1; }
+       | array                    { $$ = $1; }
+       | ID %prec LVAL            { $$ = (void*) createLval(Id, $1, NULL, NULL); }
 
-record : lVal PT ID
+record : lVal PT ID               { $$ = (void*) createLval(RecordAccess, $3, $1, NULL); }
 
-array  : lVal LSQB expr RSQB
-       | ID LSQB expr RSQB
+array  : lVal LSQB expr RSQB      { $$ = (void*) createLval(ArrayAccess, NULL, $1, $3); }
 
 /* ---------------- arithmetic --------------- */
 
@@ -98,7 +110,8 @@ arithm : expr PLS expr
        | expr MIN expr
        | expr MUL expr
        | expr DIV expr
-       | MIN expr %prec UMIN
+
+unary  : MIN expr %prec UMIN
 
 /* --------------- comparison ---------------- */
 
@@ -124,9 +137,9 @@ decls  : decls decl
        | /* empty */
 
 decl   : varDec
-       | funDec
+       | funDecs %prec DECL
        | tyDec
-       | error { printf("\t%s: Invalid declaration at 'Text'.\n", SynError); YYABORT; }
+       | error { printf("\t%s: Invalid declaration.\n", SynError); YYABORT; }
 
 idType : INTT
        | FLTT
@@ -152,7 +165,7 @@ varDec2: COLL idType opErr expr
 
 /* -= errors =- */
 opErr  : ASGN
-       | error { printf("\t%s: Expected ':=' at 'Text'.\n", SynError); YYABORT; }
+       | error { printf("\t%s: Expected ':='.\n", SynError); YYABORT; }
 
 /* -= types declaration =- */
 
@@ -172,7 +185,10 @@ tySeq2 : tySeq2 COMM tyDec2
 
 /* -= function declaration =- */
 
-funDec : FUN ID LPAR argDec RPAR funDec2
+funDecs: funDecs funDec
+       | funDec
+       
+funDec: FUN ID LPAR argDec RPAR funDec2
 funDec2: COLL idType EQ expr %prec FEQ
        | EQ expr %prec FEQ
 
