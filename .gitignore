@@ -2,5 +2,6 @@
 book/
 build/
 bin/
+test/THEtest/
 
 .*.swp
