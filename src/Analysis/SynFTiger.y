@@ -1,8 +1,12 @@
 %{
   #include <stdio.h>
+  #include <stdarg.h>
   int yylex(void);
-  void yyerror(char const *);
 %}
+
+%code requires {
+  void yyerror(const char*, ...);
+}
 
 %locations
 
@@ -15,7 +19,7 @@
 
 %token INTO
 %token ID
-%token INTT FLTT STRT ANST
+%token INTT FLTT STRT ANST CNTT STRCT
 
 %token LVAL
 %token UMIN
@@ -114,6 +118,8 @@ idType : INTT
        | FLTT
        | STRT
        | ANST
+       | CNTT
+       | STRCT
        | ID
 
 argDec : ID COLL idType argDec2
@@ -193,10 +199,15 @@ aCreat : ID LSQB expr RSQB OF expr
 
 extern FILE *yyin;
 
-void yyerror(const char *s) {
-  printf("Syntax error: %s(%d,%d)(%d,%d) tok->%d.\n", s,
-    yylloc.first_line, yylloc.first_column,
-    yylloc.last_line, yylloc.last_column, yychar);
+void yyerror(const char *s, ...) {
+  va_list Args;
+  va_start(Args, s);
+
+  printf("@[%d,%d]: ", yylloc.first_line, yylloc.first_column);
+  vprintf(s, Args);
+  printf("\n");
+
+  va_end(Args);
 }
 
 int main(int argc, char **argv) {

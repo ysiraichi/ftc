@@ -1,15 +1,22 @@
 %{
-
 #include "Analysis/UtilLex.h"
 #include "${BISON_Parser_OUTPUT_HEADER}"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 %}
 
 %option stack
+%option yylineno
+
+%{
+/* This keeps track of the location on the input code */
+int yycolumn;
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = yylineno; \
+  yylloc.first_column = yycolumn; yylloc.last_column = yycolumn+yyleng-1; \
+  yycolumn += yyleng;
+%}
 
 %x STRING ESCAPE CONTROL
 %x COMMENT
@@ -47,10 +54,12 @@ char *StringBufPtr;
                             return STR; 
                           }
 \\                        { yy_push_state(ESCAPE); }
-[^\"\\]+                  { 
+[^\"\\\n\r]+              { 
                             copyToBuffer(&StringBuf, &StringBufPtr, 
                               &StringBufMax, yytext);
                           }
+[\n\r]                    { yycolumn = 1; }
+<<EOF>>                   { yyerror("LexicalError: String not terminated."); }
 }
 
 <ESCAPE>{
@@ -72,7 +81,7 @@ t                         {
                           } 
 \^                        { yy_push_state(CONTROL); }
 {NESC}                    {   
-                            printf("LexicalError: Escaped character not recognized: \\%s.\n", yytext); 
+                            yyerror("LexicalError: Escaped character '%s' not recognized.", yytext); 
                             yy_pop_state();
                           }
 }
@@ -133,7 +142,7 @@ M                         {
                             yy_pop_state();
                           }
 {NCTR}                    { 
-                            printf("LexicalError: Control character not recognized: \\^%s.\n", yytext); 
+                            yyerror("LexicalError: Control character '%s' not recognized.", yytext); 
                             yy_pop_state();
                             yy_pop_state();
                           }
@@ -162,7 +171,9 @@ M                         {
 "/*"                      { yy_push_state(COMMENT); }
 <COMMENT>"*/"             { yy_pop_state(); }
 <COMMENT>"/*"             { yy_push_state(COMMENT); }
-<COMMENT>([\n\r]|.)
+<COMMENT>[\n\r]           { yycolumn = 1; }
+<COMMENT><<EOF>>          { yyerror("LexicalError: Comment not terminated."); }
+<COMMENT>.
 
 "+"                       { return PLS;   }
 "-"                       { return MIN;   }
@@ -193,9 +204,10 @@ M                         {
 
 [a-zA-Z]+[0-9a-zA-Z_]*    { return ID; }
 
-{BLNK}                    { /* eat some spaces */ }
+[\t ]                     { /* eat some spaces */ }
+[\n\r]                    { yycolumn = 1; }
 
-.                         { printf("LexicalError: Token not recognized: %s.\n", yytext); }
+.                         { yyerror("LexicalError: Token '%s' not recognized.", yytext); }
 
 %%
 
