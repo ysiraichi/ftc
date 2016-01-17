@@ -1,0 +1,5 @@
+let
+  type myType = int -> answer
+in
+  X()
+end

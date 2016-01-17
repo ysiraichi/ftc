@@ -1,0 +1,9 @@
+let
+
+  function neg(x: int) = 
+    if x < 0 then x
+    else -1 * x
+
+in
+  neg(-7)
+end
