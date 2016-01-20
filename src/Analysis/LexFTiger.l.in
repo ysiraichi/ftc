@@ -211,10 +211,11 @@ M                         {
                             return ID; 
                           }
 
-[\t ]                     { /* eat some spaces */ }
+\t                        { yycolumn += 2; }
+" "                       { yycolumn += 1; }
 [\n\r]                    { yycolumn = 1; }
 
-.                         { yyerror("%s: Token '%s' not recognized.", LexError, yytext); }
+[[:^space:]]*             { yyerror("%s: Token '%s' not recognized.", LexError, yytext); }
 
 %%
 
