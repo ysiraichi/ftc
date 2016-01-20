@@ -2,17 +2,23 @@
 
 #include <stdlib.h>
 
+NilT *createNil(void) {
+  return (NilT*) malloc(sizeof(NilT));
+}
+
 ExprT *createExpr(ExprKind K, void *Ptr) {
   ExprT *Expr = (ExprT*) malloc(sizeof(ExprT));
   Expr->Kind = K;
   switch (K) {
-    case Lit: Expr->Value.Lit = (LitT*) Ptr; break;
-    case Lval: Expr->Value.Lval = (LvalT*) Ptr; break;
-    case BinOp: Expr->Value.BinOp = (BinOpT*) Ptr; break;
-    case Let: Expr->Value.Let = (LetT*) Ptr; break;
-    case IfStmt: Expr->Value.IfStmt = (IfStmtT*) Ptr; break;
+    case Lit:     Expr->Value.Lit     = (LitT*)     Ptr; break;
+    case Lval:    Expr->Value.Lval    = (LvalT*)    Ptr; break;
+    case BinOp:   Expr->Value.BinOp   = (BinOpT*)   Ptr; break;
+    case Neg:     Expr->Value.Neg     = (NegT*)     Ptr; break;
+    case Let:     Expr->Value.Let     = (LetT*)     Ptr; break;
+    case IfStmt:  Expr->Value.IfStmt  = (IfStmtT*)  Ptr; break;
     case FunCall: Expr->Value.FunCall = (FunCallT*) Ptr; break;
-    case Create: Expr->Value.Create = (CreateT*) Ptr; break;
+    case Create:  Expr->Value.Create  = (CreateT*)  Ptr; break;
+    case Nil:     Expr->Value.Nil     = (NilT*)     Ptr; break;
   }
   return Expr;
 }

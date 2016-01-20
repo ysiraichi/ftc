@@ -215,7 +215,7 @@ M                         {
 " "                       { yycolumn += 1; }
 [\n\r]                    { yycolumn = 1; }
 
-[[:^space:]]*             { yyerror("%s: Token '%s' not recognized.", LexError, yytext); }
+.                         { yyerror("%s: Token '%s' not recognized.", LexError, yytext); }
 
 %%
 

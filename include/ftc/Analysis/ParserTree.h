@@ -1,6 +1,7 @@
 #ifndef PARSERTREE_H
 #define PARSERTREE_H
 
+typedef struct NilT NilT;
 typedef struct ExprT ExprT;
 typedef struct LitT LitT;
 typedef struct LvalT LvalT;
@@ -24,13 +25,14 @@ typedef struct ArrayTyT ArrayTyT;
 typedef struct RecordT RecordT;
 typedef struct FieldT FieldT;
 
-typedef enum { Lit, Lval, BinOp, Let, IfStmt, FunCall, Create } ExprKind;
+typedef enum { Lit, Lval, BinOp, Neg, Let, IfStmt, FunCall, Create, Nil } ExprKind;
 typedef enum { Int, Float, String, Answer, Cont, StrConsumer, Name, ParamTy, FunTy, ArrayTy } TypeKind;
 typedef enum { Id, RecordAccess, ArrayAccess } LvalKind;
 typedef enum { Sum, Sub, Mult, Div, Eq, Diff, Lt, Le, Gt, Ge, And, Or } OpKind;
 typedef enum { Var, Fun, Ty } DeclKind;
 typedef enum { Array, Record } CreateKind;
 
+NilT     *createNil(void);
 ExprT    *createExpr(ExprKind, void*);
 LitT     *createLit(TypeKind, void*);
 LvalT    *createLval(LvalKind, char*, LvalT*, ExprT*);
@@ -207,6 +209,8 @@ struct LitT {
 };
 
 // -----------------------------------------------= Expression
+struct NilT {};
+
 struct ExprT {
   TypeT *Type;
   ExprKind Kind; 
@@ -214,10 +218,12 @@ struct ExprT {
     LitT     *Lit;
     LvalT    *Lval;
     BinOpT   *BinOp;
+    NegT     *Neg;
     LetT     *Let;
     IfStmtT  *IfStmt;
     FunCallT *FunCall;
     CreateT  *Create;
+    NilT     *Nil;
   } Value;
 };
 

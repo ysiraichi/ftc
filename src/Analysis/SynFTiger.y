@@ -9,6 +9,8 @@ int yylex(void);
 static const char LexError[] = "LexicalError";
 static const char SynError[] = "SyntaticalError";
 
+ExprT *Root;
+
 %}
 
 %code requires {
@@ -58,32 +60,34 @@ static const char SynError[] = "SyntaticalError";
 %left DIV MUL
 %right UMIN
 
-%type <Node> expr lit l-val arithm unary compare logic let
+%type <Node> program
+
+%type <Node> expr lit l-val arithm unary compare logic let if-then fun-call par-expr create
 
 %type <Node> record array decls decl var-decl fun-decl ty-decl id-type arg-decl
-%type <Node> fun-ty-decl ty-seq
+%type <Node> fun-ty-decl ty-seq fun-decls arg-expr rec-create arr-create rec-field
 
-%type <Node> arg-decl2 var-decl2 ty-decl2 ty-seq2
+%type <Node> arg-decl2 var-decl2 ty-decl2 ty-seq2 fun-decl2 arg-expr2 rec-field2
 
 %start program
 
 %%
 
-program: expr
-       | /* empty */
+program: expr                { $$ = $1; Root = $$; }
+       | /* empty */         { $$ = NULL; }
 
-expr: lit                    { $$ = NULL; }
-    | l-val                  { $$ = NULL; }
-    | arithm                 { $$ = NULL; }
-    | unary                  { $$ = NULL; }
-    | compare                { $$ = NULL; }
-    | logic                  { $$ = NULL; }
-    | let                    { $$ = NULL; }
-    | if-then                { $$ = NULL; }
-    | fun-call               { $$ = NULL; }
-    | par-expr               { $$ = NULL; }
-    | create                 { $$ = NULL; }
-    | NIL                    { $$ = NULL; }
+expr: lit                    { $$ = (void*) createExpr(Lit, $1); }
+    | l-val                  { $$ = (void*) createExpr(Lval, $1); }
+    | arithm                 { $$ = (void*) createExpr(BinOp, $1); }
+    | compare                { $$ = (void*) createExpr(BinOp, $1); }
+    | logic                  { $$ = (void*) createExpr(BinOp, $1); }
+    | unary                  { $$ = (void*) createExpr(Neg, $1); }
+    | let                    { $$ = (void*) createExpr(Let, $1); }
+    | if-then                { $$ = (void*) createExpr(IfStmt, $1); }
+    | fun-call               { $$ = (void*) createExpr(FunCall, $1); }
+    | create                 { $$ = (void*) createExpr(Create, $1); }
+    | par-expr               { $$ = $1; }
+    | NIL                    { $$ = (void*) createExpr(Nil, createNil()); }
 
 /* ----------- primitive types --------------- */
 
@@ -171,108 +175,115 @@ arg-decl2: arg-decl2 COMM ID COLL id-type   {
 
 /* -= variable declaration =- */
 
-var-decl: VAR ID var-decl2        { ((VarDeclT*) $3)->Id = $2; $$ = $3; }
-var-decl2: COLL id-type ASGN expr { $$ = (void*) createVarDecl(NULL, $4); }
-         | ASGN expr              { $$ = (void*) createVarDecl(NULL, $2); } 
+var-decl: VAR ID var-decl2        { $$ = (void*) createVarDecl($2, $3); }
+var-decl2: COLL id-type ASGN expr { $$ = $4; }
+         | ASGN expr              { $$ = $2; } 
 
 /* -= types declaration =- */
 
-ty-decl: TYPE ID EQ ty-decl2      { ((TyDeclT*) $4)->Id = $2; $$ = $4; }
-ty-decl2: id-type                 { $$ = (void*) createTyDecl(NULL, $1); }
-        | LBRK arg-decl RBRK      {
-                                    TypeT* Ty = (void*) createType(ParamTy, $2);
-                                    $$ = (void*) createTyDecl(NULL, Ty); 
-                                  }
+ty-decl: TYPE ID EQ ty-decl2      { $$ = (void*) createTyDecl($2, $4); }
+ty-decl2: id-type                 { $$ = $1; }
+        | LBRK arg-decl RBRK      { $$ = (void*) createType(ParamTy, $2); }
         | ARRY OF id-type         {
                                     ArrayTyT *Arr = (void*) createArrayTy($3); 
-                                    TypeT    *Ty  = (void*) createType(ArrayTy, Arr);
-                                    $$ = (void*) createTyDecl(NULL, Ty); 
+                                    $$ = (void*) createType(ArrayTy, Arr);
                                   }
-        | fun-ty-decl             {
-                                    TypeT* Ty = (void*) createType(FunTy, $1);
-                                    $$ = (void*) createTyDecl(NULL, Ty); 
-                                  }
+        | fun-ty-decl             { $$ = (void*) createType(FunTy, $1); }
 
 fun-ty-decl: ty-decl2 INTO ty-decl2         {
-                                              TyDeclT *One = (TyDecl*) $1;     
-                                              TyDeclT *Two = (TyDecl*) $3;
-                                              SeqTyT *From = createSeqTy(One->Type, NULL);
-                                              SeqTyT *To   = createSeqTy(Two->Type, NULL);
+                                              TypeT *One = (TypeT*) $1;     
+                                              TypeT *Two = (TypeT*) $3;
+                                              SeqTyT *From = createSeqTy(One, NULL);
+                                              SeqTyT *To   = createSeqTy(Two, NULL);
                                               $$ = (void*) createFunTy(From, To);
-                                              free(One);
-                                              free(Two);
                                             }
            | LPAR ty-seq RPAR INTO ty-decl2 {
-                                              TyDeclT *Decl = (TyDecl*) $5;
-                                              SeqTyT  *To   = createSeqTy(Decl->Type, NULL);
+                                              TypeT  *Ty = (TypeT*) $5;
+                                              SeqTyT *To = createSeqTy(Ty, NULL);
                                               $$ = (void*) createFunTy($2, To);
-                                              free(Decl);
                                             }
 
-ty-seq: ty-decl2 ty-seq2        { 
-                                  TyDeclT *Ptr = (TyDeclT*) $1;
-                                  $$ = createSeqTy(Ptr->Type, $2); 
-                                  free(Ptr); 
-                                }
+ty-seq: ty-decl2 ty-seq2        { $$ = createSeqTy($1, $2); }
       | /* empty */             { $$ = NULL; }
 ty-seq2: ty-seq2 COMM ty-decl2  { 
-                                  TyDeclT *Decl = (TyDeclT*) $3;
                                   if ($1) {
-                                    TySeqT *Ptr = (TySeqT*) $1;
+                                    SeqTyT *Ptr = (SeqTyT*) $1;
                                     while (Ptr->Next) Ptr = Ptr->Next;
-                                    Ptr->Next = createSeqTy($3->Type, NULL);
+                                    Ptr->Next = createSeqTy($3, NULL);
                                     $$ = $1;
                                   } else {
-                                    $$ = (void*) createSeqTy($3->Type, NULL);
+                                    $$ = (void*) createSeqTy($3, NULL);
                                   }
-                                  free($3);
                                 }
        | /* empty */            { $$ = NULL; }
 
 /* -= function declaration =- */
 
-fun-decls: fun-decls fun-decl
-         | fun-decl
+fun-decls: fun-decls fun-decl { 
+                                FunDeclT *Ptr = (FunDeclT*) $1;
+                                while (Ptr->Next) Ptr = Ptr->Next;
+                                Ptr->Next = $2;
+                                $$ = $1;
+                              }
+         | fun-decl           { $$ = $1; }
        
-fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2
-fun-decl2: COLL id-type EQ expr 
-         | EQ expr 
+fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 { $$ = (void*) createFunDecl($2, $6, $4, NULL); }
+fun-decl2: COLL id-type EQ expr               { $$ = $4; } 
+         | EQ expr                            { $$ = $2; } 
 
 /* --------------- if-then-else -------------- */
 
-if-then: IF expr THEN expr ELSE expr
-       | IF expr THEN expr
+if-then: IF expr THEN expr ELSE expr          { $$ = (void*) createIfStmt($2, $4, $6); }
+       | IF expr THEN expr                    { $$ = (void*) createIfStmt($2, $4, NULL); }
 
 /* ------------- function call --------------- */
 
-fun-call: ID LPAR arg-expr RPAR
+fun-call: ID LPAR arg-expr RPAR { $$ = (void*) createFunCall($1, $3); }
 
-arg-expr: expr arg-expr2
-        | /* empty */
-arg-expr2: arg-expr2 COMM expr 
-         | /* empty */
+arg-expr: expr arg-expr2        { $$ = (void*) createArg($1, $2); }
+        | /* empty */           { $$ = NULL; }
+arg-expr2: arg-expr2 COMM expr  { 
+                                  if ($1) {
+                                    ArgT *A = (ArgT*) $1;
+                                    while (A->Next) A = A->Next;
+                                    A->Next = createArg($3, NULL);
+                                    $$ = $1;
+                                  } else {
+                                    $$ = (void*) createArg($3, NULL);
+                                  }
+                                }
+         | /* empty */          { $$ = NULL; }
 
 /* ------------- parenthesis expr ------------ */
 
-par-expr : LPAR expr RPAR
+par-expr : LPAR expr RPAR       { $$ = $2; }
 
 /* --------------- creation ------------------ */
 
-create : rec-create
-       | arr-create
+create : rec-create             { $$ = (void*) createCreate(Record, $1); }
+       | arr-create             { $$ = (void*) createCreate(Array , $1); }
 
 /* -= record creation =- */
 
-rec-create: ID LBRK rec-field RBRK
+rec-create: ID LBRK rec-field RBRK      { $$ = (void*) createRecord($1, $3); }
 
-rec-field: ID EQ expr rec-field2
-         | /* empty */
-rec-field2: rec-field2 COMM ID EQ expr 
-          | /* empty */
+rec-field: ID EQ expr rec-field2        { $$ = (void*) createField($1, $3, $4); }
+         | /* empty */                  { $$ = NULL; }
+rec-field2: rec-field2 COMM ID EQ expr  {
+                                          if ($1) {
+                                            FieldT *Ptr = (FieldT*) $1;
+                                            while (Ptr->Next) Ptr = Ptr->Next;
+                                            Ptr->Next = createField($3, $5, NULL);
+                                            $$ = $1;
+                                          } else {
+                                            $$ = (void*) createField($3, $5, NULL);
+                                          }
+                                        }
+          | /* empty */                 { $$ = NULL; }
 
 /* -= array creation=- */
 
-arr-create: ID LSQB expr RSQB OF expr 
+arr-create: ID LSQB expr RSQB OF expr  { $$ = (void*) createArray($1, $3, $6); }
 
 /* ------------------------------------------- */
 
