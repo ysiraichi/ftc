@@ -53,6 +53,12 @@ BinOpT *createBinOp(OpKind K, ExprT *E1, ExprT *E2) {
   return BinOp;
 }
 
+NegT *createNeg(ExprT *E) {
+  NegT *Neg = (NegT*) malloc(sizeof(NegT));
+  Neg->Expr = E;
+  return Neg;
+}
+
 LetT *createLet(DeclT *D, ExprT *E) {
   LetT *Let = (LetT*) malloc(sizeof(LetT));
   Let->Decl = D;
@@ -84,10 +90,12 @@ TypeT *createType(TypeKind K, void *Ptr) {
   return Type;
 }
 
-ParamTyT *createParamTy(char *I, ParamTyT *PNext) {
+ParamTyT *createParamTy(char *I, TypeT *Ty, ParamTyT *PNext) {
   ParamTyT *Params = (ParamTyT*) malloc(sizeof(ParamTyT));
   Params->Id = I;
+  Params->Type = Ty;
   Params->Next = PNext;
+  return Params;
 }
 
 VarDeclT *createVarDecl(char *I, ExprT *E) {
