@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include "ftc/Analysis/ParserTree.h"
+#include "ftc/Analysis/DrawDotTree.h"
 
 int yylex(void);
 
@@ -305,5 +306,6 @@ void yyerror(const char *s, ...) {
 int main(int argc, char **argv) {
   if (argc > 1) yyin = fopen(argv[1], "r");
   int parsing = yyparse();
+  if (!parsing) drawDotTree("MyTree.dot", Root);
   return parsing;
 }
