@@ -11,6 +11,7 @@ static const char LexError[] = "LexicalError";
 
 %option stack
 %option yylineno
+%option noyywrap
 
 %{
 /* This keeps track of the location on the input code */
@@ -219,16 +220,3 @@ M                         {
 
 %%
 
-/*
-int main(int argc, char **argv) {
-  int n;
-  if (argc > 1) {
-    printf("File: %s\n", argv[1]);
-    yyin = fopen(argv[1], "r");
-  }
-  while ((n = yylex())) {
-    printf("Token No: %d\n", n);
-  }
-  return 0;
-}
-*/

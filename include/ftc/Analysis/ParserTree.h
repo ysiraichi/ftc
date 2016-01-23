@@ -1,7 +1,7 @@
 #ifndef PARSERTREE_H
 #define PARSERTREE_H
 
-#include "ftc/Analysis/ASTNodeVector.h"
+#include "ftc/Support/PtrVector.h"
 
 #define VEC_SIZE 2
 
@@ -27,13 +27,14 @@ typedef enum {
 struct ASTNode {
   NodeKind Kind;
   void *Value;
-  ASTNodeVector Child;
+  PtrVector Child;
 };
 
 ASTNode *createASTNode   (NodeKind, void*, int,...);
 void     destroyASTNode  (ASTNode*);
 void     addToASTNode    (ASTNode*, ASTNode*);
-void     moveAllToASTNode(ASTNode*, ASTNodeVector*);
+void     moveAllToASTNode(ASTNode*, PtrVector*);
 
+ASTNode *Root;
 
 #endif

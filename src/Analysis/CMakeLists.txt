@@ -1,12 +1,12 @@
-SET(FLEX_INPUT "LexFTiger")
-SET(BISON_INPUT "SynFTiger")
+set (FLEX_INPUT "LexFTiger")
+set (BISON_INPUT "SynFTiger")
 
 BISON_TARGET(Parser 
   "${BISON_INPUT}.y" 
   "${CMAKE_CURRENT_BINARY_DIR}/${BISON_INPUT}.c"
   COMPILE_FLAGS "-v")
 
-CONFIGURE_FILE("${FLEX_INPUT}.l.in" "${CMAKE_CURRENT_BINARY_DIR}/${FLEX_INPUT}.l")
+configure_file ("${FLEX_INPUT}.l.in" "${CMAKE_CURRENT_BINARY_DIR}/${FLEX_INPUT}.l")
 
 FLEX_TARGET(Scanner 
   "${CMAKE_CURRENT_BINARY_DIR}/${FLEX_INPUT}.l" 
@@ -14,8 +14,10 @@ FLEX_TARGET(Scanner
 
 ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
 
+add_library (Analysis 
+  ${FLEX_Scanner_OUTPUTS} 
+  ${BISON_Parser_OUTPUTS}
+  ParserTree.c 
+  DrawTree.c)
 
-ADD_EXECUTABLE(ftc ${FLEX_Scanner_OUTPUTS} ${BISON_Parser_OUTPUTS}
-  ParserTree.c DrawDotTree.c)
-TARGET_LINK_LIBRARIES(ftc ${FLEX_LIBRARIES})
-INSTALL(TARGETS ftc RUNTIME DESTINATION bin)
+target_link_libraries (Analysis Support ${FLEX_LIBRARIES})

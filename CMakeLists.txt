@@ -1,11 +1,11 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-PROJECT(FTC-1.0)
+cmake_minimum_required (VERSION 2.6)
+project (FTC-1.0)
 
-INCLUDE_DIRECTORIES(include)
+include_directories (include)
 
-FIND_PACKAGE(BISON)
-FIND_PACKAGE(FLEX)
+find_package (BISON)
+find_package (FLEX)
 
-SET(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}")
+set (CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}")
 
-ADD_SUBDIRECTORY(src)
+add_subdirectory (src)
