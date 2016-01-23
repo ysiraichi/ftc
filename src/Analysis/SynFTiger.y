@@ -3,12 +3,14 @@
 #include <stdarg.h>
 
 #include "ftc/Analysis/ParserTree.h"
+#include "ftc/Analysis/DrawTree.h"
 
 int yylex(void);
 
 static const char LexError[] = "LexicalError";
 static const char SynError[] = "SyntaticalError";
 
+ASTNode *Root;
 %}
 
 %code requires {
@@ -70,7 +72,7 @@ static const char SynError[] = "SyntaticalError";
 
 %%
 
-program: expr               { $$ = $1; destroyASTNode($1); }
+program: expr               { Root = $1; }
        | /* empty */        { $$ = NULL; }
 
 expr: lit                   { $$ = $1; }
@@ -317,5 +319,7 @@ void yyerror(const char *s, ...) {
 int main(int argc, char **argv) {
   if (argc > 1) yyin = fopen(argv[1], "r");
   int parsing = yyparse();
+  drawDotTree("MyDot.dot", Root);
+  destroyASTNode(Root);
   return parsing;
 }

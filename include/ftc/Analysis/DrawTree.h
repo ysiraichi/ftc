@@ -3,6 +3,6 @@
 
 #include "ftc/Analysis/ParserTree.h"
 
-void drawDotTree(char*, ExprT*);
+void drawDotTree(const char*, ASTNode*);
 
 #endif
