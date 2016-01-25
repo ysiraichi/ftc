@@ -6,6 +6,7 @@
 static FILE *O;
 static char Name[][64] = {
   "DeclList",
+  "TyDeclList",
   "FunDeclList",
   "ArgDeclList",
   "TySeqList",

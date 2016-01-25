@@ -53,6 +53,9 @@ extern ASTNode *Root;
 
 %precedence "declaration"
 %precedence FUN
+%precedence TYPE
+
+%precedence LPAR
 
 %left OR
 %left AND
@@ -66,7 +69,7 @@ extern ASTNode *Root;
 %type <Node> ty-seq fun-decl if-then fun-call arg-expr rec-create 
 %type <Node> rec-field arr-create par-expr create
 
-%type <Vector> decls arg-decl2 ty-seq2 fun-decls arg-expr2 rec-field2 var-decl2 fun-decl2
+%type <Vector> decls ty-decls fun-decls arg-expr2 rec-field2 var-decl2 fun-decl2 arg-decl2 ty-seq2
 
 %start program
 
@@ -159,7 +162,10 @@ decl: var-decl                      { $$ = $1; }
                                       $$ = createASTNode(FunDeclList, NULL, 0); 
                                       moveAllToASTNode($$, $1);
                                     }
-    | ty-decl                       { $$ = $1; }
+    | ty-decls %prec "declaration"  { 
+                                      $$ = createASTNode(TyDeclList, NULL, 0); 
+                                      moveAllToASTNode($$, $1);
+                                    }
 
 id-type: INTT                 { $$ = createASTNode(IntTy   , NULL, 0); }
        | FLTT                 { $$ = createASTNode(FloatTy , NULL, 0); }
@@ -201,6 +207,12 @@ var-decl2: COLL id-type ASGN expr {
                                   } 
 
 /* -= types declaration =- */
+
+ty-decls: ty-decls ty-decl                 { appendToPtrVector($1, $2); $$ = $1; }
+        | ty-decl                          {
+                                             $$ = createPtrVector();
+                                             appendToPtrVector($$, $1);
+                                           }
 
 ty-decl: TYPE ID EQ ty-decl2      { $$ = createASTNode(TyDecl, $2, 1, $4); }
 ty-decl2: id-type                 { $$ = $1; }
@@ -254,7 +266,7 @@ if-then: IF expr THEN expr ELSE expr    { $$ = createASTNode(IfStmtExpr, NULL, 3
 
 /* ------------- function call --------------- */
 
-fun-call: ID LPAR arg-expr RPAR         { $$ = createASTNode(FunCallExpr, $1, 1, $3); } 
+fun-call: expr LPAR arg-expr RPAR       { $$ = createASTNode(FunCallExpr, NULL, 2, $1, $3); } 
 
 arg-expr: expr arg-expr2                {
                                           $$ = createASTNode(ArgExprList, NULL, 1, $1);
