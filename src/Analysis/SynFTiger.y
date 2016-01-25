@@ -10,7 +10,7 @@ int yylex(void);
 static const char LexError[] = "LexicalError";
 static const char SynError[] = "SyntaticalError";
 
-ASTNode *Root;
+extern ASTNode *Root;
 %}
 
 %code requires {
@@ -149,8 +149,8 @@ let: LET decls IN expr END    {
 
 decls: decls decl             { 
                                 if ($1) $$ = $1;
-                                else $$ = createASTNodeVector();
-                                appendASTNode($$, $2); 
+                                else $$ = createPtrVector();
+                                appendToPtrVector($$, $2); 
                               }
      | /* empty */            { $$ = NULL; }
 
@@ -177,9 +177,9 @@ arg-decl: ID COLL id-type arg-decl2       {
         | /* empty */                     { $$ = NULL; }
 arg-decl2: arg-decl2 COMM ID COLL id-type {
                                             if ($1) $$ = $1; 
-                                            else $$ = createASTNodeVector();
+                                            else $$ = createPtrVector();
                                             ASTNode *Node = createASTNode(ArgDecl, $3, 1, $5); 
-                                            appendASTNode($$, Node);
+                                            appendToPtrVector($$, Node);
                                           }
          | /* empty */                    { $$ = NULL; }
 
@@ -191,13 +191,13 @@ var-decl: VAR ID var-decl2        {
                                     moveAllToASTNode($$, $3);
                                   }
 var-decl2: COLL id-type ASGN expr { 
-                                    $$ = createASTNodeVector(); 
-                                    appendASTNode($$, $2);
-                                    appendASTNode($$, $4);
+                                    $$ = createPtrVector(); 
+                                    appendToPtrVector($$, $2);
+                                    appendToPtrVector($$, $4);
                                   }
          | ASGN expr              { 
-                                    $$ = createASTNodeVector(); 
-                                    appendASTNode($$, $2);
+                                    $$ = createPtrVector(); 
+                                    appendToPtrVector($$, $2);
                                   } 
 
 /* -= types declaration =- */
@@ -219,18 +219,18 @@ ty-seq: ty-decl2 ty-seq2        {
       | /* empty */             { $$ = NULL; }
 ty-seq2: ty-seq2 COMM ty-decl2  {
                                   if ($1) $$ = $1;
-                                  else $$ = createASTNodeVector();
+                                  else $$ = createPtrVector();
                                   ASTNode *Node = createASTNode(TySeq, NULL, 1, $3);
-                                  appendASTNode($$, Node);
+                                  appendToPtrVector($$, Node);
                                 }
        | /* empty */            { $$ = NULL; }
 
 /* -= function declaration =- */
 
-fun-decls: fun-decls fun-decl                 { appendASTNode($1, $2); $$ = $1; }
+fun-decls: fun-decls fun-decl                 { appendToPtrVector($1, $2); $$ = $1; }
          | fun-decl                           {
-                                                $$ = createASTNodeVector();
-                                                appendASTNode($$, $1);
+                                                $$ = createPtrVector();
+                                                appendToPtrVector($$, $1);
                                               }
        
 fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 { 
@@ -238,13 +238,13 @@ fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 {
                                                 moveAllToASTNode($$, $6);
                                               }
 fun-decl2: COLL id-type EQ expr               { 
-                                                $$ = createASTNodeVector();
-                                                appendASTNode($$, $2);
-                                                appendASTNode($$, $4);
+                                                $$ = createPtrVector();
+                                                appendToPtrVector($$, $2);
+                                                appendToPtrVector($$, $4);
                                               }
          | EQ expr                            { 
-                                                $$ = createASTNodeVector(); 
-                                                appendASTNode($$, $2);
+                                                $$ = createPtrVector(); 
+                                                appendToPtrVector($$, $2);
                                               }
 
 /* --------------- if-then-else -------------- */
@@ -263,8 +263,8 @@ arg-expr: expr arg-expr2                {
         | /* empty */                   { $$ = NULL; }
 arg-expr2: arg-expr2 COMM expr          { 
                                           if ($1) $$ = $1;
-                                          else $$ = createASTNodeVector();
-                                          appendASTNode($$, $3); 
+                                          else $$ = createPtrVector();
+                                          appendToPtrVector($$, $3); 
                                         }
          | /* empty */                  { $$ = NULL; }
 
@@ -289,9 +289,9 @@ rec-field: ID EQ expr rec-field2        {
          | /* empty */                  { $$ = NULL; }
 rec-field2: rec-field2 COMM ID EQ expr  { 
                                           if ($1) $$ = $1;
-                                          else $$ = createASTNodeVector();
+                                          else $$ = createPtrVector();
                                           ASTNode *Node = createASTNode(FieldExpr, $3, 1, $5);
-                                          appendASTNode($$, Node); 
+                                          appendToPtrVector($$, Node); 
                                         }
           | /* empty */                 { $$ = NULL; }
 
@@ -303,8 +303,6 @@ arr-create: ID LSQB expr RSQB OF expr   { $$ = createASTNode(ArrayExpr, $1, 2, $
 
 %%
 
-extern FILE *yyin;
-
 void yyerror(const char *s, ...) {
   va_list Args;
   va_start(Args, s);
@@ -314,12 +312,4 @@ void yyerror(const char *s, ...) {
   printf("\n");
 
   va_end(Args);
-}
-
-int main(int argc, char **argv) {
-  if (argc > 1) yyin = fopen(argv[1], "r");
-  int parsing = yyparse();
-  drawDotTree("MyDot.dot", Root);
-  destroyASTNode(Root);
-  return parsing;
 }
