@@ -78,18 +78,21 @@ extern ASTNode *Root;
 program: expr               { Root = $1; }
        | /* empty */        { $$ = NULL; }
 
-expr: lit                   { $$ = $1; }
-    | l-val                 { $$ = $1; }
-    | arithm                { $$ = $1; }
-    | unary                 { $$ = $1; }
-    | compare               { $$ = $1; }
-    | logic                 { $$ = $1; }
-    | let                   { $$ = $1; }
-    | if-then               { $$ = $1; }
-    | fun-call              { $$ = $1; }
-    | par-expr              { $$ = $1; }
-    | create                { $$ = $1; }
-    | NIL                   { $$ = createASTNode(NilExpr, NULL, 0); }
+expr: lit                   { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | l-val                 { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | arithm                { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | unary                 { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | compare               { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | logic                 { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | let                   { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | if-then               { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | fun-call              { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | par-expr              { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | create                { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+    | NIL                   { 
+                              $$ = createASTNode(NilExpr, NULL, 0); 
+                              setASTNodePos($$, @1.first_line, @1.first_column); 
+                            }
 
 /* ----------- primitive types --------------- */
 
@@ -154,6 +157,7 @@ decls: decls decl             {
                                 if ($1) $$ = $1;
                                 else $$ = createPtrVector();
                                 appendToPtrVector($$, $2); 
+                                setASTNodePos($2, @2.first_line, @2.first_column);
                               }
      | /* empty */            { $$ = NULL; }
 

@@ -27,6 +27,7 @@ typedef enum {
 struct ASTNode {
   NodeKind Kind;
   void *Value;
+  unsigned Pos[2];
   PtrVector Child;
 };
 
@@ -34,6 +35,7 @@ ASTNode *createASTNode   (NodeKind, void*, int,...);
 void     destroyASTNode  (ASTNode*);
 void     addToASTNode    (ASTNode*, ASTNode*);
 void     moveAllToASTNode(ASTNode*, PtrVector*);
+void     setASTNodePos   (ASTNode*, unsigned, unsigned);
 
 ASTNode *Root;
 

@@ -49,3 +49,7 @@ void destroyASTNode(ASTNode *Node) {
   free(Node);
 }
 
+void setASTNodePos(ASTNode *Node, unsigned Line, unsigned Col) {
+  Node->Pos[0] = Line;
+  Node->Pos[1] = Col;
+}
