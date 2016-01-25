@@ -8,13 +8,12 @@
 typedef struct ASTNode ASTNode;
 
 typedef enum {
-  DeclList = 0, TyDeclList, FunDeclList, ArgDeclList, TySeqList, ArgExprList, FieldExprList,
+  DeclList = 0, TyDeclList, FunDeclList, ArgDeclList, ArgExprList, FieldExprList,
 
   /* Declarations */
   VarDecl, FunDecl, TyDecl, ArgDecl,
-  TySeq,
   IntTy, FloatTy, StringTy, AnswerTy, ContTy, StrConsumerTy, 
-  IdTy, FunTy, ArrayTy, 
+  IdTy, FunTy, ArrayTy, SeqTy, RecordTy,
 
   /* Expressions */
   IntLit, FloatLit, StringLit, 

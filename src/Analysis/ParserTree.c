@@ -25,7 +25,7 @@ ASTNode *createASTNode(NodeKind K, void *Value, int N, ...) {
 
 /* function */
 void addToASTNode(ASTNode *Parent, ASTNode *Child) {
-  appendToPtrVector(&(Parent->Child), Child);
+  ptrVectorAppend(&(Parent->Child), Child);
 }
 
 /* function */

@@ -17,7 +17,8 @@ void initPtrVector(PtrVector*, size_t);
 void destroyPtrVector(PtrVector*);
 void destroyPtrVectorContents(PtrVector*);
 int expandPtrVector(PtrVector*);
-int appendToPtrVector(PtrVector*, void*);
+int ptrVectorAppend(PtrVector*, void*);
+void *ptrVectorGet(PtrVector*, unsigned);
 
 PtrVector *createPtrVector(void);
 

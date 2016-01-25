@@ -156,7 +156,7 @@ let: LET decls IN expr END    {
 decls: decls decl             { 
                                 if ($1) $$ = $1;
                                 else $$ = createPtrVector();
-                                appendToPtrVector($$, $2); 
+                                ptrVectorAppend($$, $2); 
                                 setASTNodePos($2, @2.first_line, @2.first_column);
                               }
      | /* empty */            { $$ = NULL; }
@@ -189,7 +189,7 @@ arg-decl2: arg-decl2 COMM ID COLL id-type {
                                             if ($1) $$ = $1; 
                                             else $$ = createPtrVector();
                                             ASTNode *Node = createASTNode(ArgDecl, $3, 1, $5); 
-                                            appendToPtrVector($$, Node);
+                                            ptrVectorAppend($$, Node);
                                           }
          | /* empty */                    { $$ = NULL; }
 
@@ -202,20 +202,20 @@ var-decl: VAR ID var-decl2        {
                                   }
 var-decl2: COLL id-type ASGN expr { 
                                     $$ = createPtrVector(); 
-                                    appendToPtrVector($$, $2);
-                                    appendToPtrVector($$, $4);
+                                    ptrVectorAppend($$, $2);
+                                    ptrVectorAppend($$, $4);
                                   }
          | ASGN expr              { 
                                     $$ = createPtrVector(); 
-                                    appendToPtrVector($$, $2);
+                                    ptrVectorAppend($$, $2);
                                   } 
 
 /* -= types declaration =- */
 
-ty-decls: ty-decls ty-decl                 { appendToPtrVector($1, $2); $$ = $1; }
+ty-decls: ty-decls ty-decl                 { ptrVectorAppend($1, $2); $$ = $1; }
         | ty-decl                          {
                                              $$ = createPtrVector();
-                                             appendToPtrVector($$, $1);
+                                             ptrVectorAppend($$, $1);
                                            }
 
 ty-decl: TYPE ID EQ ty-decl2      { $$ = createASTNode(TyDecl, $2, 1, $4); }
@@ -228,25 +228,23 @@ fun-ty-decl: ty-decl2 INTO ty-decl2         { $$ = createASTNode(FunTy, NULL, 2,
            | LPAR ty-seq RPAR INTO ty-decl2 { $$ = createASTNode(FunTy, NULL, 2, $2, $5); }
 
 ty-seq: ty-decl2 ty-seq2        {
-                                  ASTNode *Node = createASTNode(TySeq, NULL, 1, $1); 
-                                  $$ = createASTNode(TySeqList, NULL, 1, Node);
+                                  $$ = createASTNode(SeqTy, NULL, 1, $1);
                                   if ($2) moveAllToASTNode($$, $2);
                                 }
       | /* empty */             { $$ = NULL; }
 ty-seq2: ty-seq2 COMM ty-decl2  {
                                   if ($1) $$ = $1;
                                   else $$ = createPtrVector();
-                                  ASTNode *Node = createASTNode(TySeq, NULL, 1, $3);
-                                  appendToPtrVector($$, Node);
+                                  ptrVectorAppend($$, $3);
                                 }
        | /* empty */            { $$ = NULL; }
 
 /* -= function declaration =- */
 
-fun-decls: fun-decls fun-decl                 { appendToPtrVector($1, $2); $$ = $1; }
+fun-decls: fun-decls fun-decl                 { ptrVectorAppend($1, $2); $$ = $1; }
          | fun-decl                           {
                                                 $$ = createPtrVector();
-                                                appendToPtrVector($$, $1);
+                                                ptrVectorAppend($$, $1);
                                               }
        
 fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 { 
@@ -255,12 +253,12 @@ fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 {
                                               }
 fun-decl2: COLL id-type EQ expr               { 
                                                 $$ = createPtrVector();
-                                                appendToPtrVector($$, $2);
-                                                appendToPtrVector($$, $4);
+                                                ptrVectorAppend($$, $2);
+                                                ptrVectorAppend($$, $4);
                                               }
          | EQ expr                            { 
                                                 $$ = createPtrVector(); 
-                                                appendToPtrVector($$, $2);
+                                                ptrVectorAppend($$, $2);
                                               }
 
 /* --------------- if-then-else -------------- */
@@ -280,7 +278,7 @@ arg-expr: expr arg-expr2                {
 arg-expr2: arg-expr2 COMM expr          { 
                                           if ($1) $$ = $1;
                                           else $$ = createPtrVector();
-                                          appendToPtrVector($$, $3); 
+                                          ptrVectorAppend($$, $3); 
                                         }
          | /* empty */                  { $$ = NULL; }
 
@@ -307,7 +305,7 @@ rec-field2: rec-field2 COMM ID EQ expr  {
                                           if ($1) $$ = $1;
                                           else $$ = createPtrVector();
                                           ASTNode *Node = createASTNode(FieldExpr, $3, 1, $5);
-                                          appendToPtrVector($$, Node); 
+                                          ptrVectorAppend($$, Node); 
                                         }
           | /* empty */                 { $$ = NULL; }
 

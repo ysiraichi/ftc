@@ -33,10 +33,15 @@ int expandPtrVector(PtrVector *V) {
 }
 
 /* function */
-int appendToPtrVector(PtrVector *V, void *Elem) {
+int ptrVectorAppend(PtrVector *V, void *Elem) {
   if (V->Size == V->MaxSize && !expandPtrVector(V)) return 0;
   V->Head[V->Size++] = Elem;
   return 1;
+}
+
+/* function */
+void *ptrVectorGet(PtrVector *V, unsigned Pos) {
+  return V->Head[Pos];
 }
 
 /* function */
