@@ -1,1 +1,1 @@
-add_library (Support PtrVector.c)
+add_library (Support PtrVector.c Hash.c)
