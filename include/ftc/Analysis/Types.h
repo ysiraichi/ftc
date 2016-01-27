@@ -1,13 +1,16 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "ftc/Analysis/ParserTree.h"
+
+typedef struct Type Type;
+
 struct Type {
   NodeKind Kind;
-  union {
-    Type      Ty; 
-    Type      *Fn[2];
-    PtrVector Seq;
-  } V;
-}
+  void    *Val;
+};
+
+Type *createType (NodeKind, void*);
+int   compareType(Type*, Type*);
 
 #endif

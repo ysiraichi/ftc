@@ -3,11 +3,30 @@
 
 #include "ftc/Support/PtrVector.h"
 
-#define BUCK_SIZE 100
+#define BUCK_SIZE 10
 
-typedef PtrVector Hash[BUCK_SIZE];
+typedef struct Hash Hash;
+typedef struct Pair Pair;
 
-void hashInsert(Hash*, char*, void*);
+struct Pair {
+  char *Key;
+  void *Value;
+};
+
+struct Hash {
+  PtrVector Pairs;
+  PtrVector Pool[BUCK_SIZE];
+};
+
+int hashInsert(Hash*, char*, void*);
+void hashInsertOrChange(Hash*, char*, void*);
 void *hashFind(Hash*, char*);
+int hashExists(Hash*, char*);
+
+void initHash(Hash*);
+Hash *createHash(void);
+
+PtrVectorIterator beginHash(Hash*);
+PtrVectorIterator endHash(Hash*);
 
 #endif
