@@ -7,7 +7,7 @@ let
   function getInt(done: intConsumer) =
     let function nextDigit(accum: int) =
       let function eatChar(dig: string) =
-        if isDigit(dig) then (accum * 10 + ord(dig))
+        if isDigit(dig) then nextDigit(accum * 10 + ord(dig))
         else done(accum)
       in 
         getchar(eatChar)

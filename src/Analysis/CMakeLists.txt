@@ -18,6 +18,10 @@ add_library (Analysis
   ${FLEX_Scanner_OUTPUTS} 
   ${BISON_Parser_OUTPUTS}
   ParserTree.c 
-  DrawTree.c)
+  DrawTree.c
+  SymbolTable.c
+  Types.c
+  TypeCheck.c
+  BaseEnviroment.c)
 
 target_link_libraries (Analysis Support ${FLEX_LIBRARIES})
