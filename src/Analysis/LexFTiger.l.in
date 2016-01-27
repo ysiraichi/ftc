@@ -156,8 +156,6 @@ M                         {
 "float"                   { return FLTT; }
 "string"                  { return STRT; }
 "answer"                  { return ANST; }
-"cont"                    { return CNTT; }
-"stringConsumer"          { return STRCT; }
 
 "type"                    { return TYPE; }
 "let"                     { return LET;  }

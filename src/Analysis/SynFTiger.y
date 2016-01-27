@@ -38,7 +38,7 @@ extern ASTNode *Root;
 %token LPAR RPAR LSQB RSQB LBRK RBRK COLL COMM PT SMCL
 
 %token INTO
-%token INTT FLTT STRT ANST CNTT STRCT
+%token INTT FLTT STRT ANST
 
 %precedence THEN
 %precedence ELSE
@@ -50,12 +50,11 @@ extern ASTNode *Root;
 
 %precedence LVAL
 %precedence LSQB
+%precedence RSQB
 
 %precedence "declaration"
 %precedence FUN
 %precedence TYPE
-
-%precedence LPAR
 
 %left OR
 %left AND
@@ -63,6 +62,8 @@ extern ASTNode *Root;
 %left PLS MIN
 %left DIV MUL
 %right UMIN
+
+%precedence LPAR
 
 %type <Node> program expr lit l-val record array arithm unary compare logic let 
 %type <Node> decl id-type arg-decl var-decl ty-decl ty-decl2 fun-ty-decl 
@@ -110,13 +111,20 @@ lit: INT                    {
 
 /* ----------------- l-value ----------------- */
 
-l-val: record                 { $$ = $1; }
-     | array                  { $$ = $1; } 
-     | ID %prec LVAL          { $$ = createASTNode(IdLval, $1, 0); }
+l-val: record                 { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); }
+     | array                  { $$ = $1; setASTNodePos($1, @1.first_line, @1.first_column); } 
+     | ID %prec LVAL          { 
+                                $$ = createASTNode(IdLval, $1, 0); 
+                                setASTNodePos($$, @1.first_line, @1.first_column);
+                              }
 
 record: l-val PT ID           { $$ = createASTNode(RecAccessLval, $3, 1, $1); }
 
 array: l-val LSQB expr RSQB   { $$ = createASTNode(ArrAccessLval, NULL, 2, $1, $3); }
+     | ID LSQB expr RSQB      { 
+                                ASTNode *LVal = createASTNode(IdLval, $1, 0);
+                                $$ = createASTNode(ArrAccessLval, NULL, 2, LVal, $3);
+                              }
 
 /* ---------------- arithmetic --------------- */
 
@@ -175,8 +183,6 @@ id-type: INTT                 { $$ = createASTNode(IntTy   , NULL, 0); }
        | FLTT                 { $$ = createASTNode(FloatTy , NULL, 0); }
        | STRT                 { $$ = createASTNode(StringTy, NULL, 0); }
        | ANST                 { $$ = createASTNode(AnswerTy, NULL, 0); }
-       | CNTT                 { $$ = createASTNode(ContTy  , NULL, 0); }
-       | STRCT                { $$ = createASTNode(StrConsumerTy, NULL, 0); }
        | ID                   { $$ = createASTNode(IdTy    , $1  , 0); }
 
 arg-decl: ID COLL id-type arg-decl2       { 
@@ -207,6 +213,7 @@ var-decl2: COLL id-type ASGN expr {
                                   }
          | ASGN expr              { 
                                     $$ = createPtrVector(); 
+                                    ptrVectorAppend($$, NULL);
                                     ptrVectorAppend($$, $2);
                                   } 
 
@@ -218,13 +225,19 @@ ty-decls: ty-decls ty-decl                 { ptrVectorAppend($1, $2); $$ = $1; }
                                              ptrVectorAppend($$, $1);
                                            }
 
-ty-decl: TYPE ID EQ ty-decl2      { $$ = createASTNode(TyDecl, $2, 1, $4); }
+ty-decl: TYPE ID EQ ty-decl2      { 
+                                    $$ = createASTNode(TyDecl, $2, 1, $4); 
+                                    setASTNodePos($$, @$.first_line, @$.first_column);
+                                  }
 ty-decl2: id-type                 { $$ = $1; }
         | LBRK arg-decl RBRK      { $$ = $2; }
         | ARRY OF id-type         { $$ = createASTNode(ArrayTy, NULL, 1, $3); }
         | fun-ty-decl             { $$ = $1; }
 
-fun-ty-decl: ty-decl2 INTO ty-decl2         { $$ = createASTNode(FunTy, NULL, 2, $1, $3); }
+fun-ty-decl: ty-decl2 INTO ty-decl2         { 
+                                              ASTNode *SeqNode = createASTNode(SeqTy, NULL, 1, $1);
+                                              $$ = createASTNode(FunTy, NULL, 2, SeqNode, $3); 
+                                            }
            | LPAR ty-seq RPAR INTO ty-decl2 { $$ = createASTNode(FunTy, NULL, 2, $2, $5); }
 
 ty-seq: ty-decl2 ty-seq2        {
@@ -249,6 +262,7 @@ fun-decls: fun-decls fun-decl                 { ptrVectorAppend($1, $2); $$ = $1
        
 fun-decl: FUN ID LPAR arg-decl RPAR fun-decl2 { 
                                                 $$ = createASTNode(FunDecl, $2, 1, $4); 
+                                                setASTNodePos($$, @$.first_line, @$.first_column);
                                                 moveAllToASTNode($$, $6);
                                               }
 fun-decl2: COLL id-type EQ expr               { 
@@ -258,13 +272,14 @@ fun-decl2: COLL id-type EQ expr               {
                                               }
          | EQ expr                            { 
                                                 $$ = createPtrVector(); 
+                                                ptrVectorAppend($$, NULL);
                                                 ptrVectorAppend($$, $2);
                                               }
 
 /* --------------- if-then-else -------------- */
 
 if-then: IF expr THEN expr ELSE expr    { $$ = createASTNode(IfStmtExpr, NULL, 3, $2, $4, $6); } 
-       | IF expr THEN expr              { $$ = createASTNode(IfStmtExpr, NULL, 2, $2, $4); }
+       | IF expr THEN expr              { $$ = createASTNode(IfStmtExpr, NULL, 3, $2, $4, NULL); }
 
 /* ------------- function call --------------- */
 
