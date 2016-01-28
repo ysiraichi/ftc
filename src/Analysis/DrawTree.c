@@ -26,6 +26,7 @@ static char Name[][64] = {
   "ArrayTy",
   "RecordTy",
   "SeqTy",
+  "NilTy",
   "IntLit",
   "FloatLit",
   "StringLit",

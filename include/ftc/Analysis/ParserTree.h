@@ -13,7 +13,7 @@ typedef enum {
   /* Declarations */
   VarDecl, FunDecl, TyDecl, ArgDecl,
   IntTy, FloatTy, StringTy, AnswerTy, ContTy, StrConsumerTy, 
-  IdTy, FunTy, ArrayTy, SeqTy, RecordTy,
+  IdTy, FunTy, ArrayTy, SeqTy, NilTy, RecordTy,
 
   /* Expressions */
   IntLit, FloatLit, StringLit, 
