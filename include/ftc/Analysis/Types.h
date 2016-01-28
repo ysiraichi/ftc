@@ -10,7 +10,10 @@ struct Type {
   void    *Val;
 };
 
-Type *createType (NodeKind, void*);
-int   compareType(Type*, Type*);
+Type *createType  (NodeKind, void*);
+Type *createFnType(Type*, Type*);
+int   compareType (Type*, Type*);
+
+void  dumpType(Type*);
 
 #endif
