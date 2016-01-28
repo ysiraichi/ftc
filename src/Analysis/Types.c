@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 
+/* <function> */
 static void simplifyType(Type **Ty) {
   if (!(*Ty)) return;
   if ((*Ty)->Kind != SeqTy) return;
@@ -17,6 +18,7 @@ static void simplifyType(Type **Ty) {
   }
 }
 
+/* <function> */
 void dumpType(Type *Ty) {
   if (!Ty) return;
   else {
@@ -79,6 +81,7 @@ void dumpType(Type *Ty) {
   }
 }
 
+/* <function> */
 Type *createType(NodeKind K, void *Ptr) {
   Type *Ty = (Type*) malloc(sizeof(Type));
   Ty->Kind = K;
@@ -86,6 +89,7 @@ Type *createType(NodeKind K, void *Ptr) {
   return Ty;
 }
 
+/* <function> */
 Type *createFnType(Type *From, Type *To) {
   Type **TyArr = (Type**) malloc(sizeof(Type*) * 2);
   if (From) simplifyType(&From);
@@ -95,18 +99,47 @@ Type *createFnType(Type *From, Type *To) {
   return createType(FunTy, TyArr);
 }
 
+/* <function> */
+void destroyType(void *T) {
+  if (!T) return;
+  Type *Ty = (Type*) T;
+  switch (Ty->Kind) {
+    case ArrayTy:
+      destroyType(Ty->Val);
+      break;
+    case FunTy:
+      {
+        Type **Arr = (Type**) Ty->Val;
+        destroyType(Arr[0]);
+        destroyType(Arr[1]);
+      } break;
+    case RecordTy:
+      {
+        Hash *H = (Hash*) Ty->Val;
+        destroyHash(H, &destroyType);
+      } break;
+    case SeqTy:
+      {
+        PtrVector *V = (PtrVector*) Ty->Val;
+        destroyPtrVector(V, &destroyType);
+      } break;
+  }
+  free(Ty);
+}
+
+/* <function> */
 int compareType(Type *One, Type *Two) {
   simplifyType(&One);
   simplifyType(&Two);
 
   /*
-  printf("------------------\n");
-  dumpType(One);
-  printf(" == ");
-  dumpType(Two);
-  printf("\n");
-  printf("------------------\n");
-  */
+     printf("------------------\n");
+     dumpType(One);
+     printf(" == ");
+     dumpType(Two);
+     printf("\n");
+     printf("------------------\n");
+     */
 
   if (!One && !Two) return 1;
   if (!One || !Two) return 0;

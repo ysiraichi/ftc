@@ -12,6 +12,7 @@ struct Type {
 
 Type *createType  (NodeKind, void*);
 Type *createFnType(Type*, Type*);
+void  destroyType (void*);
 int   compareType (Type*, Type*);
 
 void  dumpType(Type*);
