@@ -31,7 +31,7 @@ struct ASTNode {
 };
 
 ASTNode *createASTNode   (NodeKind, void*, int,...);
-void     destroyASTNode  (ASTNode*);
+void     destroyASTNode  (void*);
 void     addToASTNode    (ASTNode*, ASTNode*);
 void     moveAllToASTNode(ASTNode*, PtrVector*);
 void     setASTNodePos   (ASTNode*, unsigned, unsigned);

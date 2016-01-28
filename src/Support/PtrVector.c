@@ -12,13 +12,16 @@ void initPtrVector(PtrVector *V, size_t MaxSize) {
 }
 
 /* function */
-void destroyPtrVectorContents(PtrVector *V) {
-  free(V->Head);
+void destroyPtrVectorContents(PtrVector *V, void (*destroyElem)(void*)) {
+  PtrVectorIterator I = beginPtrVector(V),
+                    E = endPtrVector(V);
+  if (destroyElem) for (; I != E; ++I) (*destroyElem)(*I);
+  if (V->Head) free(V->Head);
 }
 
 /* function */
-void destroyPtrVector(PtrVector *V) {
-  destroyPtrVectorContents(V);
+void destroyPtrVector(PtrVector *V, void (*destroyElem)(void*)) {
+  destroyPtrVectorContents(V, destroyElem);
   free(V);
 }
 

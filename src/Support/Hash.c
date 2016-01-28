@@ -3,6 +3,11 @@
 #include <string.h>
 #include <stdio.h>
 
+static void destroyPair(Pair *P, void (*destroyValue)(void*)) {
+  if (destroyValue) (*destroyValue)(P->Value);
+  free(P);
+}
+
 static Pair *createPair(char *Key, void *Value) {
   Pair *P  = (Pair*) malloc(sizeof(Pair));
   P->Key   = Key;
@@ -71,15 +76,31 @@ int hashExists(Hash *H, char *Key) {
 void initHash(Hash *H) {
   int I;
   initPtrVector(&(H->Pairs), 0);
-  for (I = 0; I < BUCK_SIZE; ++I) {
+  for (I = 0; I < BUCK_SIZE; ++I) 
     initPtrVector(&(H->Pool[I]), 0);
-  }
 }
 
 Hash *createHash(void) {
   Hash *H = (Hash*) malloc(sizeof(Hash));
   initHash(H);
   return H;
+}
+
+void destroyHashContents(Hash *H, void (*destroyElem)(void*)) {
+  PtrVectorIterator I = beginPtrVector(&(H->Pairs)),
+                    E = endPtrVector(&(H->Pairs));
+  for (; I != E; ++I) 
+    destroyPair(*I, destroyElem);
+
+  destroyPtrVectorContents(&(H->Pairs), NULL);
+  int B = 0;
+  for (B = 0; B < BUCK_SIZE; ++B) 
+    destroyPtrVectorContents(hashGetBucket(H, B), NULL);
+}
+
+void destroyHash(Hash *H, void (*destroyElem)(void*)) {
+  destroyHashContents(H, destroyElem);
+  free(H);
 }
 
 PtrVectorIterator beginHash(Hash *H) { return beginPtrVector(&(H->Pairs)); }

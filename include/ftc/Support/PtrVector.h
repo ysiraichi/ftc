@@ -14,8 +14,8 @@ struct PtrVector {
 };
 
 void initPtrVector(PtrVector*, size_t);
-void destroyPtrVector(PtrVector*);
-void destroyPtrVectorContents(PtrVector*);
+void destroyPtrVector(PtrVector*, void (*)(void*));
+void destroyPtrVectorContents(PtrVector*, void (*)(void*));
 int expandPtrVector(PtrVector*);
 int ptrVectorAppend(PtrVector*, void*);
 void *ptrVectorGet(PtrVector*, unsigned);

@@ -25,6 +25,8 @@ int hashExists(Hash*, char*);
 
 void initHash(Hash*);
 Hash *createHash(void);
+void destroyHash(Hash*, void (*)(void*));
+void destroyHashContents(Hash*, void (*)(void*));
 
 PtrVectorIterator beginHash(Hash*);
 PtrVectorIterator endHash(Hash*);

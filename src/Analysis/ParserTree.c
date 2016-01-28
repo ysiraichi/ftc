@@ -33,19 +33,15 @@ void moveAllToASTNode(ASTNode *Node, PtrVector *Vector) {
   PtrVectorIterator I, E;
   for (I = beginPtrVector(Vector), E = endPtrVector(Vector); I != E; ++I)
     addToASTNode(Node, *I);
-  destroyPtrVector(Vector);
+  destroyPtrVector(Vector, NULL);
 }
 
 /* function */
-void destroyASTNode(ASTNode *Node) {
+void destroyASTNode(void *V) {
+  if (!V) return;
+  ASTNode *Node = (ASTNode*) V;
   if (Node->Value) free(Node->Value);
-
-  PtrVectorIterator I, E;
-  PtrVector *V = &(Node->Child);
-  for (I = beginPtrVector(V), E = endPtrVector(V); I != E; ++I)
-    if (*I) destroyASTNode(*I);
-  destroyPtrVectorContents(V);
-
+  destroyPtrVectorContents(&(Node->Child), &destroyASTNode);
   free(Node);
 }
 
