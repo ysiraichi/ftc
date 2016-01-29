@@ -36,11 +36,30 @@ static Type *getRealType(SymbolTable *TyTable, char *S) {
 /* <function> */
 static Type *resolveType(SymbolTable *TyTable, Type *Ty) {
   if (!Ty) return NULL;
-  if (Ty->Kind == IdTy) {
-    Type *Real = getRealType(TyTable, Ty->Val);
-    if (Real && Real->Kind == IdTy)
-      return symTableFind(TyTable, Real->Val);
-    return Real;
+  switch (Ty->Kind) {
+    case IdTy:
+      {
+        Type *Real = getRealType(TyTable, Ty->Val);
+        if (Real && Real->Kind == IdTy)
+          return symTableFind(TyTable, Real->Val);
+        return Real;
+      }
+    case FunTy:
+      {
+        Type **Arr = (Type**) Ty->Val;
+        Arr[0] = resolveType(TyTable, Arr[0]);
+        Arr[1] = resolveType(TyTable, Arr[1]);
+      } break;
+    case SeqTy:
+      {
+        PtrVector *V = (PtrVector*) Ty->Val;
+        PtrVectorIterator I = beginPtrVector(V),
+                          E = endPtrVector(V);
+        for (; I != E; ++I)
+          *I = resolveType(TyTable, *I);
+      } break;
+    default:
+      break;
   }
   return Ty;
 }
@@ -107,6 +126,8 @@ static Type *getTypeFromASTNode(SymbolTable *TyTable, ASTNode *Node) {
           }
           return createType(RecordTy, Record);
         }
+      default:
+        return NULL;
     }
   }
   return createType(Node->Kind, NULL);
@@ -212,7 +233,7 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         ASTNode *TyNode = (ASTNode*) ptrVectorGet(V, 0),
                 *Expr   = (ASTNode*) ptrVectorGet(V, 1);
         Type *ExprType  = checkExpr(TyTable, ValTable, Expr),
-             *DeclType, *NewDeclType;
+             *DeclType;
 
         if (ExprType->Kind == NilTy && !TyNode) semError(1, Node, 
             "Initializing var '%s', which is not a record, with 'nil'.", Node->Value);
@@ -261,6 +282,8 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
           semError(1, Node, "Type declared of function '%s' does not match.", Node->Value);
         destroyType(DeclTy);
       } break;
+    default:
+      break;
   }
   return 1;
 }
@@ -313,10 +336,9 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       {
         Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)), 
              *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
-        if (!E1 || !E2) break;
         if (typeEqual(TyTable, E1, E2) && (E1->Kind == IntTy || E1->Kind == FloatTy))
           return E1;
-        else semError(1, Node, "Arithmetic operation permited only on Float or Int type.");
+        else semError(1, Node, "Arithmetic operation permited only on same type, Float or Int operands.");
       } break;
     case AndOp:
     case OrOp:
@@ -332,7 +354,7 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
         if (!ExprType) break;
         if (ExprType->Kind == IntTy || ExprType->Kind == FloatTy) return ExprType;
-        else semError(1, Node, "Arithmetic operation permited only on Float or Int type.");
+        else semError(1, Node, "Arithmetic operation permited only on same type, Float or Int operands.");
       } break;
     case LtOp:
     case LeOp:
@@ -344,7 +366,7 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         if (typeEqual(TyTable, E1, E2) && (E1->Kind == IntTy || E1->Kind == FloatTy || 
               E1->Kind == StringTy))
           return createType(IntTy, NULL);
-        else semError(1, Node, "Inequality operation permited only on Float, Int or String type.");
+        else semError(1, Node, "Inequality operation permited only on same type, Float, String or Int operands.");
       } break;
     case EqOp:
     case DiffOp:
@@ -448,6 +470,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       }
     case NilExpr:
       return createType(NilTy, NULL);
+    default:
+      break;
   }
   return NULL;
 }
