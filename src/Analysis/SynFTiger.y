@@ -187,7 +187,10 @@ id-type: INTT                 { $$ = createASTNode(IntTy   , NULL, 0); }
 
 arg-decl: ID COLL id-type arg-decl2       { 
                                             ASTNode *Node = createASTNode(ArgDecl, $1, 1, $3); 
+                                            setASTNodePos(Node, @1.first_line, @1.first_column);
+                                            setASTNodePos($3, @3.first_line, @3.first_column);
                                             $$ = createASTNode(ArgDeclList, NULL, 1, Node);
+                                            setASTNodePos($$, @$.first_line, @$.first_column);
                                             if ($4) moveAllToASTNode($$, $4);
                                           }
         | /* empty */                     { $$ = NULL; }
@@ -195,6 +198,8 @@ arg-decl2: arg-decl2 COMM ID COLL id-type {
                                             if ($1) $$ = $1; 
                                             else $$ = createPtrVector();
                                             ASTNode *Node = createASTNode(ArgDecl, $3, 1, $5); 
+                                            setASTNodePos(Node, @3.first_line, @3.first_column);
+                                            setASTNodePos($5, @5.first_line, @5.first_column);
                                             ptrVectorAppend($$, Node);
                                           }
          | /* empty */                    { $$ = NULL; }
@@ -229,10 +234,13 @@ ty-decl: TYPE ID EQ ty-decl2      {
                                     $$ = createASTNode(TyDecl, $2, 1, $4); 
                                     setASTNodePos($$, @$.first_line, @$.first_column);
                                   }
-ty-decl2: id-type                 { $$ = $1; }
-        | LBRK arg-decl RBRK      { $$ = $2; }
-        | ARRY OF id-type         { $$ = createASTNode(ArrayTy, NULL, 1, $3); }
-        | fun-ty-decl             { $$ = $1; }
+ty-decl2: id-type                 { $$ = $1; setASTNodePos($$, @1.first_line, @1.first_column); }
+        | LBRK arg-decl RBRK      { $$ = $2; setASTNodePos($$, @1.first_line, @1.first_column); }
+        | ARRY OF id-type         { 
+                                    $$ = createASTNode(ArrayTy, NULL, 1, $3); 
+                                    setASTNodePos($$, @3.first_line, @3.first_column);
+                                  }
+        | fun-ty-decl             { $$ = $1; setASTNodePos($$, @1.first_line, @1.first_column); }
 
 fun-ty-decl: ty-decl2 INTO ty-decl2         { 
                                               ASTNode *SeqNode = createASTNode(SeqTy, NULL, 1, $1);
