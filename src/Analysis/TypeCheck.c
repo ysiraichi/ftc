@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 
 static int typeEqual(SymbolTable*, Type*, Type*);
@@ -12,7 +13,7 @@ int checkDecl(SymbolTable*, SymbolTable*, ASTNode*);
 Type *checkExpr(SymbolTable*, SymbolTable*, ASTNode*);
 
 /* <function> */
-static void semError(ASTNode *Node, const char *S, ...) {
+static void semError(int Stop, ASTNode *Node, const char *S, ...) {
   printf("@[%u,%u]: ", Node->Pos[0], Node->Pos[1]);
   va_list Args;
   va_start(Args, S);
@@ -20,7 +21,7 @@ static void semError(ASTNode *Node, const char *S, ...) {
   va_end(Args);
   printf("\n");
 
-  exit(1);
+  if (Stop) exit(1);
 }
 
 /* <function> */
@@ -28,43 +29,20 @@ static Type *getRealType(SymbolTable *TyTable, char *S) {
   Type *T = (Type*) symTableFind(TyTable, S);
   if (!T) return NULL;
   else if (T->Kind == IdTy) return getRealType(TyTable, T->Val);
+  else if (T->Kind >= IntTy && T->Kind <= AnswerTy) return T;
   return createType(IdTy, S);
 }
 
 /* <function> */
 static Type *resolveType(SymbolTable *TyTable, Type *Ty) {
   if (!Ty) return NULL;
-  Type *Return;
-  switch (Ty->Kind) {
-    case IdTy:
-      Return = symTableFind(TyTable, Ty->Val);
-      break;
-    case ArrayTy:
-      Return = createType(ArrayTy, resolveType(TyTable, Ty->Val));
-      break;
-    case FunTy:
-      {
-        Type **Arr = (Type**) Ty->Val,
-             *From = resolveType(TyTable, Arr[0]),
-             *To   = resolveType(TyTable, Arr[1]);
-        Return = createFnType(From, To);
-      } break;
-    case SeqTy:
-      {
-        PtrVector *V   = createPtrVector(),
-                  *Old = (PtrVector*) Ty->Val;
-        PtrVectorIterator I = beginPtrVector(Old),
-                          E = endPtrVector(Old);
-        for (; I != E; ++I)
-          ptrVectorAppend(V, resolveType(TyTable, *I));
-        Return = createType(SeqTy, V);
-      } break;
-    default:
-      Return = Ty;
-      break;
+  if (Ty->Kind == IdTy) {
+    Type *Real = getRealType(TyTable, Ty->Val);
+    if (Real && Real->Kind == IdTy)
+      return symTableFind(TyTable, Real->Val);
+    return Real;
   }
-  if (!compareType(Return, Ty)) Return = resolveType(TyTable, Return);
-  return Return;
+  return Ty;
 }
 
 /* <function> */
@@ -93,7 +71,9 @@ static Type *getTypeFromASTNode(SymbolTable *TyTable, ASTNode *Node) {
                       E = endPtrVector(V);
     switch (Node->Kind) {
       case IdTy:
-        return getRealType(TyTable, Node->Value);
+        if (symTableExists(TyTable, Node->Value))
+          return createType(IdTy, Node->Value);
+        semError(1, Node, "Undefined type '%s'.", Node->Value);
       case ArrayTy:
         {
           ASTNode *TyNode = (ASTNode*) ptrVectorGet(V, 0);
@@ -122,7 +102,7 @@ static Type *getTypeFromASTNode(SymbolTable *TyTable, ASTNode *Node) {
             Type    *Ty     = getTypeFromASTNode(TyTable, TyNode);
             if (!Ty && (TyNode->Kind == IdTy && 
                   !symTableExists(TyTable, TyNode->Value))) 
-              semError(Node, "Undefined type '%s'.", (char*) TyNode->Value);
+              semError(1, N, "Undefined type '%s'.", (char*) TyNode->Value);
             hashInsert(Record, N->Value, Ty); 
           }
           return createType(RecordTy, Record);
@@ -163,10 +143,15 @@ void checkCycle(SymbolTable *TyTable, ASTNode *Start) {
   hashInsert(H, Start->Value, NULL);
   Type *Ptr = symTableFind(TyTable, Start->Value);
   while (1) {
-    if (Ptr->Kind == IdTy && hashExists(H, Ptr->Val)) 
-      semError(Start, "Recursive type '%s' is not a record nor an array.", 
-          Ptr->Val);
-    else if (Ptr->Kind == IdTy) {
+    if (Ptr->Kind == IdTy && hashExists(H, Ptr->Val)) {
+      Type *Begin = Ptr;
+      do {
+        semError(0, Start, "Recursive type '%s' is not a record nor an array.", 
+            Ptr->Val);
+        Ptr = symTableFind(TyTable, Ptr->Val);
+      } while (strcmp((char*)Ptr->Val, (char*)Begin->Val));
+      exit(1);
+    } else if (Ptr->Kind == IdTy) {
       hashInsert(H, Ptr->Val, NULL);
       Ptr = symTableFind(TyTable, Ptr->Val);
     } else return; 
@@ -178,8 +163,6 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   PtrVector *V = &(Node->Child);
   PtrVectorIterator I = beginPtrVector(V),
                     E = endPtrVector(V);
-
-
   switch (Node->Kind) {
     case DeclList:
       for (; I != E; ++I) checkDecl(TyTable, ValTable, *I);
@@ -191,8 +174,9 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
           ASTNode *N = (ASTNode*) *I;
           if (hashInsert(ThisBlock, N->Value, NULL)) {
             symTableInsertOrChange(TyTable, N->Value, NULL);
-          } else semError(N, "Type named '%s' already declared in this block.", N->Value);
+          } else semError(1, N, "Type named '%s' already declared in this block.", N->Value);
         }
+        destroyHash(ThisBlock, NULL);
 
         I = beginPtrVector(V);
         E = endPtrVector(V);
@@ -215,8 +199,9 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
           Type    *FnType = getTypeFromFnNode(TyTable, N);
           if (hashInsert(ThisBlock, N->Value, NULL)) {
             symTableInsertOrChange(ValTable, N->Value, FnType);
-          } else semError(N, "Function named '%s' already declared in this block.", N->Value);
+          } else semError(1, N, "Function named '%s' already declared in this block.", N->Value);
         }
+        destroyHash(ThisBlock, NULL);
 
         for (I = beginPtrVector(V), E = endPtrVector(V); I != E; ++I)
           checkDecl(TyTable, ValTable, *I);
@@ -229,7 +214,7 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         Type *ExprType  = checkExpr(TyTable, ValTable, Expr),
              *DeclType, *NewDeclType;
 
-        if (ExprType->Kind == NilTy && !TyNode) semError(Node, 
+        if (ExprType->Kind == NilTy && !TyNode) semError(1, Node, 
             "Initializing var '%s', which is not a record, with 'nil'.", Node->Value);
 
         if (TyNode) DeclType = getTypeFromASTNode(TyTable, TyNode);
@@ -237,23 +222,22 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
 
         if (typeEqual(TyTable, ExprType, DeclType))
           symTableInsertOrChange(ValTable, Node->Value, DeclType); 
-        else semError(Node, "Incompatible types of variable '%s'.", Node->Value);
+        else semError(1, Node, "Incompatible types of variable '%s'.", Node->Value);
       } break;
     case TyDecl:
       {
         ASTNode *TyNode = (ASTNode*) ptrVectorGet(V, 0);
         Type    *RTy    = getTypeFromASTNode(TyTable, TyNode);
 
-        if (TyNode->Kind == IdTy && symTableExists(TyTable, TyNode->Value)) {
-          if (!RTy) RTy = createType(IdTy, TyNode->Value);
-        } else if (TyNode->Kind == IdTy) 
-          semError(Node, "Undefined type '%s'.", Node->Value);
+        if (TyNode->Kind == IdTy && !symTableExists(TyTable, TyNode->Value)) 
+          semError(1, Node, "Undefined type '%s'.", Node->Value);
 
         symTableInsertOrChange(TyTable, Node->Value, RTy);
       } break;
     case FunDecl: 
       {
         ASTNode *Params = (ASTNode*) ptrVectorGet(V, 0),
+                *TyNode = (ASTNode*) ptrVectorGet(V, 1),
                 *Expr   = (ASTNode*) ptrVectorGet(V, 2);
         SymbolTable *TyTable_  = createSymbolTable(TyTable),
                     *ValTable_ = createSymbolTable(ValTable);
@@ -270,12 +254,12 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         } 
 
         Type *ReturnTy = checkExpr(TyTable_, ValTable_, Expr),
-             *DeclTy   = symTableFind(ValTable, Node->Value),
-             **ArryTy  = DeclTy->Val;
+             *DeclTy   = getTypeFromASTNode(TyTable, TyNode);
+        if (!DeclTy) DeclTy = createType(AnswerTy, NULL);
 
-        if (!ReturnTy) return 0;
-        if (!typeEqual(TyTable, ReturnTy, ArryTy[1])) 
-          semError(Node, "Type declared of function '%s' does not match.", Node->Value);
+        if (!typeEqual(TyTable, ReturnTy, DeclTy)) 
+          semError(1, Node, "Type declared of function '%s' does not match.", Node->Value);
+        destroyType(DeclTy);
       } break;
   }
   return 1;
@@ -296,7 +280,7 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case IdLval:
       if (symTableExists(ValTable, Node->Value)) 
         return symTableFind(ValTable, Node->Value);
-      else semError(Node, "Identifier '%s' not declared.", Node->Value);
+      else semError(1, Node, "Identifier '%s' not declared.", Node->Value);
       break;
     case RecAccessLval:
       {
@@ -307,8 +291,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
           Hash *RecordScope = (Hash*) RealType->Val;
           if (hashExists(RecordScope, Node->Value)) 
             return hashFind(RecordScope, Node->Value);
-          else semError(Node, "Type '%s' has no member '%s'.", ExprType->Val, Node->Value);
-        } else semError(Node, "Variable type is not a record.");
+          else semError(1, Node, "Type '%s' has no member '%s'.", ExprType->Val, Node->Value);
+        } else semError(1, Node, "Variable type is not a record.");
       } break;
     case ArrAccessLval:
       {
@@ -317,11 +301,10 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         RealType = resolveType(TyTable, ExprType);
         if (RealType->Kind == ArrayTy) {
           IdxType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
-          if (!IdxType) break;
           if (IdxType->Kind == IntTy) {
             return (Type*) RealType->Val;
-          } else semError(Node, "Index is not an integer number.");
-        } else semError(Node, "Variable type is not an array.");
+          } else semError(1, Node, "Index is not an integer number.");
+        } else semError(1, Node, "Variable type is not an array.");
       } break;
     case SumOp:
     case SubOp:
@@ -333,24 +316,23 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         if (!E1 || !E2) break;
         if (typeEqual(TyTable, E1, E2) && (E1->Kind == IntTy || E1->Kind == FloatTy))
           return E1;
-        else semError(Node, "Arithmetic operation permited only on Float or Int type.");
+        else semError(1, Node, "Arithmetic operation permited only on Float or Int type.");
       } break;
     case AndOp:
     case OrOp:
       {
         Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)), 
              *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
-        if (!E1 || !E2) break;
         if (typeEqual(TyTable, E1, E2) && E1->Kind == IntTy)
           return E1;
-        else semError(Node, "Boolean operation permited only on Int type.");
+        else semError(1, Node, "Boolean operation permited only on Int type.");
       } break;
     case NegOp:
       {
         Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
         if (!ExprType) break;
         if (ExprType->Kind == IntTy || ExprType->Kind == FloatTy) return ExprType;
-        else semError(Node, "Arithmetic operation permited only on Float or Int type.");
+        else semError(1, Node, "Arithmetic operation permited only on Float or Int type.");
       } break;
     case LtOp:
     case LeOp:
@@ -359,21 +341,19 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       {
         Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)), 
              *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
-        if (!E1 || !E2) break;
         if (typeEqual(TyTable, E1, E2) && (E1->Kind == IntTy || E1->Kind == FloatTy || 
               E1->Kind == StringTy))
           return createType(IntTy, NULL);
-        else semError(Node, "Inequality operation permited only on Float, Int or String type.");
+        else semError(1, Node, "Inequality operation permited only on Float, Int or String type.");
       } break;
     case EqOp:
     case DiffOp:
       {
         Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)), 
              *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
-        if (!E1 || !E2) break;
         if (typeEqual(TyTable, E1, E2))
           return createType(IntTy, NULL);
-        else semError(Node, "Operators must be of the same type.");
+        else semError(1, Node, "Operators must be of the same type.");
       } break;
     case LetExpr:
       {
@@ -386,16 +366,15 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case IfStmtExpr:
       {
         Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-        if (!ExprType) break;
         if (ExprType->Kind == IntTy) {
           Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1)), 
                *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 2));
           if (E2 && typeEqual(TyTable, E1, E2)) return E1;
-          else if (E2) semError(Node, 
+          else if (E2) semError(1, Node, 
               "Expressions after 'THEN' and 'ELSE' must be of the same type.");
           else if (E1 && E1->Kind == AnswerTy) return E1;
-          else semError(Node, "Expression not returning 'answer' after 'THEN'.");
-        } else semError(Node, "Condition does not result in integer.");
+          else semError(1, Node, "Expression not returning 'answer' after 'THEN'.");
+        } else semError(1, Node, "Condition does not result in integer.");
       } break;
     case FunCallExpr:
       {
@@ -405,8 +384,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
           Type *ArgType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
           if (typeEqual(TyTable, ((Type**) FnType->Val)[0], ArgType))
             return (Type*) ((Type**) FnType->Val)[1];
-          else semError(Node, "Arguments do not match the call.");
-        } else semError(Node, "Expression does not result in function to call.");
+          else semError(1, Node, "Arguments do not match the call.");
+        } else semError(1, Node, "Expression does not result in function to call.");
       } break;
     case ArgExprList:
       {
@@ -420,44 +399,40 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       } break;
     case ArrayExpr:
       {
-        Type *ThisType = symTableFind(TyTable, Node->Value);
-        ThisType = resolveType(TyTable, ThisType);
-        if (ThisType) {
-          if (ThisType->Kind == ArrayTy) {
-            Type *SizeType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-            if (SizeType && SizeType->Kind == IntTy) {
-              Type *InitType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1)); 
-              if (InitType && typeEqual(TyTable, ThisType->Val, InitType)) {
-                return createType(IdTy, Node->Value);
-              } else semError(Node, "Init expression is not the same type as the array.");
-            } else semError(Node, "Size expression is not an integer type.");
-          } else semError(Node, "Type '%s' is not an array type.", Node->Value);
-        } else semError(Node, "Type '%s' undefined.", Node->Value);
+        Type *ThisType = resolveType(TyTable, createType(IdTy, Node->Value));
+        if (!ThisType) semError(1, Node, "Undefined type '%s'.", Node->Value);
+        if (ThisType->Kind == ArrayTy) {
+          Type *SizeType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
+          if (SizeType && SizeType->Kind == IntTy) {
+            Type *InitType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1)); 
+            if (InitType && typeEqual(TyTable, ThisType->Val, InitType)) {
+              return createType(IdTy, Node->Value);
+            } else semError(1, Node, "Init expression is not the same type as the array.");
+          } else semError(1, Node, "Size expression is not an integer type.");
+        } else semError(1, Node, "Type '%s' is not an array type.", Node->Value);
       } break;
     case RecordExpr:
       {
         PtrVectorIterator B, E;
-        Type *ThisType = symTableFind(TyTable, Node->Value);
-        ThisType = resolveType(TyTable, ThisType);
-        if (ThisType) {
-          if (ThisType->Kind == RecordTy) {
-            int Success = 1;
-            Type *FieldsTy = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-            FieldsTy = resolveType(TyTable, FieldsTy);
-            Hash *RecScope = (Hash*) ThisType->Val,
-                 *Record   = (Hash*) FieldsTy->Val;
-            if (RecScope->Pairs.Size == Record->Pairs.Size) {
-              for (B = beginHash(RecScope), E = endHash(RecScope); B != E; ++B) {
-                Pair *P = (Pair*) *B;
-                Success = Success && hashExists(Record, P->Key) && 
-                  typeEqual(TyTable, P->Value, hashFind(Record, P->Key));
-                if (!Success) break;
-              }
-              if (Success) return createType(IdTy, Node->Value);
-              else semError(Node, "Record '%s' did not match call.", Node->Value);
-            } else semError(Node, "Record '%s' did not match call.", Node->Value);
-          } else semError(Node, "Type '%s' is not a record.", Node->Value);
-        } else semError(Node, "Type '%s' undefined.", Node->Value);
+        Type *ThisType = resolveType(TyTable, createType(IdTy, Node->Value));
+        if (!ThisType) semError(1, Node, "Undefined type '%s'.", Node->Value);
+        if (ThisType->Kind == RecordTy) {
+          int Success = 1;
+          Type *FieldsTy = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
+          FieldsTy = resolveType(TyTable, FieldsTy);
+          Hash *RecScope = (Hash*) ThisType->Val,
+               *Record   = (Hash*) FieldsTy->Val;
+          if (RecScope->Pairs.Size == Record->Pairs.Size) {
+            for (B = beginHash(RecScope), E = endHash(RecScope); B != E; ++B) {
+              Pair *P = (Pair*) *B;
+              Success = Success && hashExists(Record, P->Key) && 
+                typeEqual(TyTable, P->Value, hashFind(Record, P->Key));
+              if (!Success) break;
+            }
+            if (Success) return createType(IdTy, Node->Value);
+            else semError(1, Node, "Record '%s' did not match call.", Node->Value);
+          } else semError(1, Node, "Record '%s' did not match call.", Node->Value);
+        } else semError(1, Node, "Type '%s' is not a record.", Node->Value);
       }
     case FieldExprList:
       {
