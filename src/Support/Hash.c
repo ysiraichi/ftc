@@ -56,7 +56,6 @@ int hashInsert(Hash *H, char *Key, void *Value) {
 }
 
 void hashInsertOrChange(Hash *H, char *Key, void *Value) {
-  unsigned Bucket = hashHash(Key);
   if (hashExists(H, Key)) hashChange(H, Key, Value);
   else hashInsert(H, Key, Value);
 }
