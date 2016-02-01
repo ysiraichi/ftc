@@ -8,17 +8,20 @@ typedef struct SymbolTable SymbolTable;
 
 struct SymbolTable {
   Hash Table;
-  SymbolTable *Outer;
+  SymbolTable *Parent;
+  PtrVector *Child;
+  int IsFunction;
 };
 
-SymbolTable *createSymbolTable(SymbolTable *Outer);
+void initSymTable(SymbolTable*, int);
+SymbolTable *createSymbolTable(SymbolTable*, int);
+
 int symTableInsert(SymbolTable*, char*, void*);
 void symTableInsertOrChange(SymbolTable*, char*, void*);
+
 Type *symTableFind(SymbolTable*, char*);
 int symTableExists(SymbolTable*, char*);
 
-void initSymTable(SymbolTable*);
-SymbolTable *createSymTable(void);
 
 PtrVectorIterator beginSymTable(SymbolTable*);
 PtrVectorIterator endSymTable(SymbolTable*);
