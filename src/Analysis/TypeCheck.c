@@ -25,12 +25,21 @@ static void semError(int Stop, ASTNode *Node, const char *S, ...) {
 }
 
 /* <function> */
-static Type *getRealType(SymbolTable *TyTable, char *S) {
-  Type *T = (Type*) symTableFind(TyTable, S);
-  if (!T) return NULL;
-  else if (T->Kind == IdTy) return getRealType(TyTable, T->Val);
-  else if (T->Kind >= IntTy && T->Kind <= AnswerTy) return T;
-  return createType(IdTy, S);
+static Type *getRealType(SymbolTable *TyTable, Type *Ty) {
+  if (!Ty) return NULL;
+  switch (Ty->Kind) {
+    case IdTy:
+      {
+        Type *Real = getRealType(TyTable, symTableFind(TyTable, Ty->Val));
+        if (Real) return Real;
+        return createType(IdTy, Ty->Val);
+      }
+    case ArrayTy:
+    case RecordTy:
+      return NULL;
+    default:
+      return createType(Ty->Kind, Ty->Val);
+  }
 }
 
 /* <function> */
@@ -38,12 +47,7 @@ static Type *resolveType(SymbolTable *TyTable, Type *Ty) {
   if (!Ty) return NULL;
   switch (Ty->Kind) {
     case IdTy:
-      {
-        Type *Real = getRealType(TyTable, Ty->Val);
-        if (Real && Real->Kind == IdTy)
-          return symTableFind(TyTable, Real->Val);
-        return Real;
-      }
+      return getRealType(TyTable, Ty);
     case FunTy:
       {
         Type **Arr = (Type**) Ty->Val;
@@ -67,15 +71,8 @@ static Type *resolveType(SymbolTable *TyTable, Type *Ty) {
 /* <function> */
 static int typeEqual(SymbolTable *TyTable, Type *T1, Type *T2) {
   if (T1 == T2) return 1;
-  if (T1 && T2) {
-    if (T1->Kind == IdTy && T2->Kind == IdTy) {
-      T1 = getRealType(TyTable, T1->Val);
-      T2 = getRealType(TyTable, T2->Val);
-    } else if (T1->Kind != RecordTy && T2->Kind != RecordTy) {
-      T1 = resolveType(TyTable, T1);
-      T2 = resolveType(TyTable, T2);
-    }
-  }
+  T1 = resolveType(TyTable, T1);
+  T2 = resolveType(TyTable, T2);
   return compareType(T1, T2);
 }
 
@@ -260,8 +257,8 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         ASTNode *Params = (ASTNode*) ptrVectorGet(V, 0),
                 *TyNode = (ASTNode*) ptrVectorGet(V, 1),
                 *Expr   = (ASTNode*) ptrVectorGet(V, 2);
-        SymbolTable *TyTable_  = createSymbolTable(TyTable),
-                    *ValTable_ = createSymbolTable(ValTable);
+        SymbolTable *TyTable_  = createSymbolTable(TyTable, 0),
+                    *ValTable_ = createSymbolTable(ValTable, 0);
 
         if (Params) {
           PtrVectorIterator IPar = beginPtrVector(&(Params->Child)),
@@ -307,9 +304,9 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       break;
     case RecAccessLval:
       {
-        Type *ExprType, *RealType;
-        ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-        RealType = resolveType(TyTable, ExprType);
+        Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)),
+             *Resolved = resolveType(TyTable, ExprType),
+             *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
         if (RealType->Kind == RecordTy) {
           Hash *RecordScope = (Hash*) RealType->Val;
           if (hashExists(RecordScope, Node->Value)) 
@@ -319,11 +316,11 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       } break;
     case ArrAccessLval:
       {
-        Type *ExprType, *RealType, *IdxType;
-        ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-        RealType = resolveType(TyTable, ExprType);
+        Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)),
+             *Resolved = resolveType(TyTable, ExprType),
+             *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
         if (RealType->Kind == ArrayTy) {
-          IdxType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
+          Type *IdxType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
           if (IdxType->Kind == IntTy) {
             return (Type*) RealType->Val;
           } else semError(1, Node, "Index is not an integer number.");
@@ -379,8 +376,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       } break;
     case LetExpr:
       {
-        SymbolTable *TyTable_  = createSymbolTable(TyTable),
-                    *ValTable_ = createSymbolTable(ValTable);
+        SymbolTable *TyTable_  = createSymbolTable(TyTable, 0),
+                    *ValTable_ = createSymbolTable(ValTable, 0);
         if (!checkDecl(TyTable_, ValTable_, ptrVectorGet(V, 0))) break;
         Type *ExprType = checkExpr(TyTable_, ValTable_, ptrVectorGet(V, 1));
         return ExprType;
@@ -421,7 +418,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       } break;
     case ArrayExpr:
       {
-        Type *ThisType = resolveType(TyTable, createType(IdTy, Node->Value));
+        Type *NodeType = resolveType(TyTable, createType(IdTy, Node->Value)),
+             *ThisType = (Type*) symTableFind(TyTable, NodeType->Val);
         if (!ThisType) semError(1, Node, "Undefined type '%s'.", Node->Value);
         if (ThisType->Kind == ArrayTy) {
           Type *SizeType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
@@ -436,12 +434,12 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case RecordExpr:
       {
         PtrVectorIterator B, E;
-        Type *ThisType = resolveType(TyTable, createType(IdTy, Node->Value));
+        Type *NodeType = resolveType(TyTable, createType(IdTy, Node->Value)),
+             *ThisType = (Type*) symTableFind(TyTable, NodeType->Val);
         if (!ThisType) semError(1, Node, "Undefined type '%s'.", Node->Value);
         if (ThisType->Kind == RecordTy) {
           int Success = 1;
           Type *FieldsTy = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0));
-          FieldsTy = resolveType(TyTable, FieldsTy);
           Hash *RecScope = (Hash*) ThisType->Val,
                *Record   = (Hash*) FieldsTy->Val;
           if (RecScope->Pairs.Size == Record->Pairs.Size) {
