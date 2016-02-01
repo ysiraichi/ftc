@@ -58,10 +58,10 @@ extern ASTNode *Root;
 
 %left OR
 %left AND
-%left EQ DIF LT LE GT GE
+%nonassoc EQ DIF LT LE GT GE
 %left PLS MIN
 %left DIV MUL
-%right UMIN
+%nonassoc UMIN
 
 %precedence LPAR
 
