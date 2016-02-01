@@ -77,6 +77,9 @@ void dumpType(Type *Ty) {
         } break;
       case NilTy:
         printf("nil");
+        break;
+      default:
+        break;
     }
   }
 }
@@ -123,6 +126,8 @@ void destroyType(void *T) {
         PtrVector *V = (PtrVector*) Ty->Val;
         destroyPtrVector(V, &destroyType);
       } break;
+    default:
+      break;
   }
   free(Ty);
 }
@@ -168,7 +173,7 @@ int compareType(Type *One, Type *Two) {
       }
     case SeqTy:
       {
-        int I = 0, Ret = 1;
+        unsigned I = 0, Ret = 1;
         PtrVector *V1 = (PtrVector*) One->Val,
                   *V2 = (PtrVector*) Two->Val;
         if (V1->Size == V2->Size) 
@@ -179,6 +184,8 @@ int compareType(Type *One, Type *Two) {
       }
     case NilTy:
       return Two->Kind == RecordTy || Two->Kind == NilTy;
+    default:
+      break;
   }
   return 0;
 }
