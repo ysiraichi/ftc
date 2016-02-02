@@ -73,6 +73,8 @@ static int typeEqual(SymbolTable *TyTable, Type *T1, Type *T2) {
   if (T1 == T2) return 1;
   T1 = resolveType(TyTable, T1);
   T2 = resolveType(TyTable, T2);
+  if (T1->Kind == NilTy && T2->Kind == IdTy) T2 = symTableFind(TyTable, T2->Val);
+  if (T2->Kind == NilTy && T1->Kind == IdTy) T1 = symTableFind(TyTable, T1->Val);
   return compareType(T1, T2);
 }
 
@@ -257,8 +259,8 @@ int checkDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
         ASTNode *Params = (ASTNode*) ptrVectorGet(V, 0),
                 *TyNode = (ASTNode*) ptrVectorGet(V, 1),
                 *Expr   = (ASTNode*) ptrVectorGet(V, 2);
-        SymbolTable *TyTable_  = createSymbolTable(TyTable, 0),
-                    *ValTable_ = createSymbolTable(ValTable, 0);
+        SymbolTable *TyTable_  = createSymbolTable(Node, TyTable),
+                    *ValTable_ = createSymbolTable(Node, ValTable);
 
         if (Params) {
           PtrVectorIterator IPar = beginPtrVector(&(Params->Child)),
@@ -305,8 +307,10 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case RecAccessLval:
       {
         Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)),
-             *Resolved = resolveType(TyTable, ExprType),
-             *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
+             *Resolved = resolveType(TyTable, ExprType); 
+        if (Resolved->Kind != IdTy) semError(1, Node, "Variable type is not a record.");
+
+        Type *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
         if (RealType->Kind == RecordTy) {
           Hash *RecordScope = (Hash*) RealType->Val;
           if (hashExists(RecordScope, Node->Value)) 
@@ -317,8 +321,10 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case ArrAccessLval:
       {
         Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)),
-             *Resolved = resolveType(TyTable, ExprType),
-             *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
+             *Resolved = resolveType(TyTable, ExprType);
+        if (Resolved->Kind != IdTy) semError(1, Node, "Variable type is not a record.");
+
+        Type *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
         if (RealType->Kind == ArrayTy) {
           Type *IdxType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
           if (IdxType->Kind == IntTy) {
@@ -376,8 +382,8 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
       } break;
     case LetExpr:
       {
-        SymbolTable *TyTable_  = createSymbolTable(TyTable, 0),
-                    *ValTable_ = createSymbolTable(ValTable, 0);
+        SymbolTable *TyTable_  = createSymbolTable(Node, TyTable),
+                    *ValTable_ = createSymbolTable(Node, ValTable);
         if (!checkDecl(TyTable_, ValTable_, ptrVectorGet(V, 0))) break;
         Type *ExprType = checkExpr(TyTable_, ValTable_, ptrVectorGet(V, 1));
         return ExprType;

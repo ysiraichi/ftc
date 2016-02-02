@@ -9,12 +9,20 @@ typedef struct SymbolTable SymbolTable;
 struct SymbolTable {
   Hash Table;
   SymbolTable *Parent;
-  PtrVector *Child;
-  int IsFunction;
+  PtrVector Child;
+  ASTNode *Owner;
 };
 
-void initSymTable(SymbolTable*, int);
-SymbolTable *createSymbolTable(SymbolTable*, int);
+void initSymTable(ASTNode*, SymbolTable*);
+SymbolTable *createSymbolTable(ASTNode*, SymbolTable*);
+
+int ownerIsFunction(SymbolTable*);
+int symTableInsertLocal(SymbolTable*, char*, void*);
+int symTableExistsLocal(SymbolTable*, char*);
+void *symTableFindLocal(SymbolTable*, char*);
+int symTableInsertGlobal(SymbolTable*, char*, void*);
+int symTableExistsGlobal(SymbolTable*, char*);
+void *symTableFindGlobal(SymbolTable*, char*);
 
 int symTableInsert(SymbolTable*, char*, void*);
 void symTableInsertOrChange(SymbolTable*, char*, void*);

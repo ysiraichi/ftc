@@ -2,20 +2,71 @@
 
 #include <stdio.h>
 
-void initSymTable(SymbolTable *St, int IsFunction) {
-  St->IsFunction = IsFunction;
+void initSymTable(ASTNode* Owner, SymbolTable *St) {
+  St->Owner      = Owner;
 
   initHash(&(St->Table));
-  initPtrVector(St->Child, 0);
+  initPtrVector(&(St->Child), 0);
 }
 
-SymbolTable *createSymbolTable(SymbolTable *Parent, int IsFunction) {
+SymbolTable *createSymbolTable(ASTNode *Owner, SymbolTable *Parent) {
   SymbolTable *St = (SymbolTable*) malloc(sizeof(SymbolTable));
-  initSymTable(St, IsFunction);
+  initSymTable(Owner, St);
 
-  if (Parent) { ptrVectorAppend(Parent->Child, St); }
+  if (Parent) { ptrVectorAppend(&(Parent->Child), St); }
   St->Parent = Parent;
   return St;
+}
+
+int ownerIsFunction(SymbolTable *St) {
+  return St->Owner->Kind == FunDecl;
+}
+
+SymbolTable *symTableFindChild(SymbolTable *St, ASTNode *Owner) {
+  PtrVector *V = &(St->Child);
+  PtrVectorIterator I = beginPtrVector(V),
+                    E = endPtrVector(V);
+  for (; I != E; ++I) {
+    SymbolTable *Child = (SymbolTable*) *I;
+    if (Child->Owner == Owner) return Child;
+  }
+  return NULL;
+}
+
+int symTableInsertLocal(SymbolTable *St, char *Key, void *Value) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
+  return symTableInsert(Ptr, Key, Value);
+}
+
+int symTableExistsLocal(SymbolTable *St, char *Key) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
+  return symTableExists(Ptr, Key);
+}
+
+void *symTableFindLocal(SymbolTable *St, char *Key) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
+  return symTableFind(Ptr, Key);
+}
+
+int symTableInsertGlobal(SymbolTable *St, char *Key, void *Value) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent) Ptr = Ptr->Parent;
+  return symTableInsert(Ptr, Key, Value);
+}
+
+int symTableExistsGlobal(SymbolTable *St, char *Key) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent) Ptr = Ptr->Parent;
+  return symTableExists(Ptr, Key);
+}
+
+void *symTableFindGlobal(SymbolTable *St, char *Key) {
+  SymbolTable *Ptr = St;
+  while (Ptr->Parent) Ptr = Ptr->Parent;
+  return symTableFind(Ptr, Key);
 }
 
 void symTableInsertOrChange(SymbolTable *St, char *Key, void *Value) {
