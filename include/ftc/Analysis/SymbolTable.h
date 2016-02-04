@@ -1,6 +1,7 @@
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
+#include "ftc/UtilDeclare.h"
 #include "ftc/Support/Hash.h"
 #include "ftc/Analysis/Types.h"
 
@@ -13,8 +14,12 @@ struct SymbolTable {
   ASTNode *Owner;
 };
 
+void toEscapedName(char*, char*);
+
 void initSymTable(ASTNode*, SymbolTable*);
 SymbolTable *createSymbolTable(ASTNode*, SymbolTable*);
+
+void insertIfEscaped(SymbolTable*, char*);
 
 int ownerIsFunction(SymbolTable*);
 int symTableInsertLocal(SymbolTable*, char*, void*);
@@ -27,7 +32,7 @@ void *symTableFindGlobal(SymbolTable*, char*);
 int symTableInsert(SymbolTable*, char*, void*);
 void symTableInsertOrChange(SymbolTable*, char*, void*);
 
-Type *symTableFind(SymbolTable*, char*);
+void *symTableFind(SymbolTable*, char*);
 int symTableExists(SymbolTable*, char*);
 
 

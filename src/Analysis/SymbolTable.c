@@ -2,6 +2,10 @@
 
 #include <stdio.h>
 
+void toEscapedName(char *Dst, char *FunName) {
+  sprintf(Dst, "escaped.%s", FunName);
+}
+
 void initSymTable(ASTNode* Owner, SymbolTable *St) {
   St->Owner      = Owner;
 
@@ -31,6 +35,28 @@ SymbolTable *symTableFindChild(SymbolTable *St, ASTNode *Owner) {
     if (Child->Owner == Owner) return Child;
   }
   return NULL;
+}
+
+void insertIfEscaped(SymbolTable *St, char *Key) {
+  char Buf[NAME_MAX];
+  int Exists;
+  Hash *EscapedVar;
+  SymbolTable *Ptr = St;
+  while (!ownerIsFunction(Ptr)) 
+    if (hashExists(&(Ptr->Table), Key)) return; // has not escaped.
+    else Ptr = Ptr->Parent; 
+  if (hashExists(&(Ptr->Table), Key)) return;   // has not escaped.
+
+  Exists = 0;
+  do {
+    Exists |= hashExists(&(Ptr->Table), Key);
+    if (!ownerIsFunction(Ptr) || !Exists) Ptr = Ptr->Parent;
+    else break;
+  } while (1);
+
+  toEscapedName(Buf, Ptr->Owner->Value);
+  EscapedVar = (Hash*) symTableFind(Ptr, Buf);
+  hashInsert(EscapedVar, Key, NULL);
 }
 
 int symTableInsertLocal(SymbolTable *St, char *Key, void *Value) {
@@ -77,7 +103,7 @@ int symTableInsert(SymbolTable *St, char *Key, void *Value) {
   return hashInsert(&(St->Table), Key, Value);
 }
 
-Type *symTableFind(SymbolTable *St, char *Key) {
+void *symTableFind(SymbolTable *St, char *Key) {
   if (!St) return NULL;
   void *Value = NULL;
   if (!(Value = hashFind(&(St->Table), Key)))
