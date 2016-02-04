@@ -14,6 +14,8 @@ FLEX_TARGET(Scanner
 
 ADD_FLEX_BISON_DEPENDENCY(Scanner Parser)
 
+add_subdirectory (TypeCheck)
+
 add_library (Analysis 
   ${FLEX_Scanner_OUTPUTS} 
   ${BISON_Parser_OUTPUTS}
@@ -21,7 +23,7 @@ add_library (Analysis
   DrawTree.c
   SymbolTable.c
   Types.c
-  TypeCheck.c
+  $<TARGET_OBJECTS:TypeChecker>
   BaseEnviroment.c)
 
 target_link_libraries (Analysis Support ${FLEX_LIBRARIES})
