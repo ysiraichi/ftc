@@ -68,7 +68,12 @@ int typeEqual(SymbolTable *TyTable, Type *T1, Type *T2) {
   if (T1 == T2) return 1;
   T1 = resolveType(TyTable, T1);
   T2 = resolveType(TyTable, T2);
-  if (T1->Kind == NilTy && T2->Kind == IdTy) T2 = symTableFind(TyTable, T2->Val);
-  if (T2->Kind == NilTy && T1->Kind == IdTy) T1 = symTableFind(TyTable, T1->Val);
+  if (T1->Kind == NilTy && T2->Kind == IdTy) {
+    T1->Val = T2->Val;
+    T2 = symTableFind(TyTable, T2->Val);
+  } else if (T2->Kind == NilTy && T1->Kind == IdTy) {
+    T2->Val = T1->Val;
+    T1 = symTableFind(TyTable, T1->Val);
+  }
   return compareType(T1, T2);
 }
