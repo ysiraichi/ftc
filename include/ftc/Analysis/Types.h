@@ -8,6 +8,7 @@ typedef struct Type Type;
 struct Type {
   NodeKind Kind;
   void    *Val;
+  int      EscapedLevel;
 };
 
 Type *createType  (NodeKind, void*);
