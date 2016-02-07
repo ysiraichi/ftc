@@ -9,11 +9,20 @@
 extern FILE    *yyin;
 extern ASTNode *Root;
 
+char MainFName[] = "main";
+char MainFEscaped[] = "escaped.main";
+
 int yyparse(void);
 
 void doTypeCheck() {
-  SymbolTable *BaseTy  = createSymbolTable(NULL),
-              *BaseVal = createSymbolTable(NULL);
+  ASTNode     *MainFunc = createASTNode(FunDecl, MainFName, 0);
+  SymbolTable *BaseTy   = createSymbolTable(NULL, 0),
+              *BaseVal  = createSymbolTable(NULL, 0);
+
+  BaseTy->Owner = MainFunc;
+  BaseVal->Owner = MainFunc;
+  symTableInsert(BaseVal, MainFEscaped, createHash());
+  
   addBaseEnviroment(BaseTy, BaseVal);
   checkExpr(BaseTy, BaseVal, Root);
 }
