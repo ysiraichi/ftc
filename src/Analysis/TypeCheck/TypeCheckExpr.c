@@ -245,8 +245,8 @@ checkRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     if (RecScope->Pairs.Size == Record->Pairs.Size) {
       for (B = beginHash(RecScope), E = endHash(RecScope); B != E; ++B) {
         Pair *P = (Pair*) *B;
-        Success = Success && hashExists(Record, P->Key) && 
-          typeEqual(TyTable, P->Value, hashFind(Record, P->Key));
+        Success = Success && hashExists(Record, P->first) && 
+          typeEqual(TyTable, P->second, hashFind(Record, P->first));
         if (!Success) break;
       }
 

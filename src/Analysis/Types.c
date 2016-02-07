@@ -57,8 +57,8 @@ void dumpType(Type *Ty) {
           printf("{ ");
           for (; I != E; ++I) {
             Pair *P = (Pair*) *I;
-            printf("%s:", P->Key);
-            dumpType(P->Value);
+            printf("%s:", (char*)P->first);
+            dumpType(P->second);
             if (I+1 != E) printf(", ");
           }
           printf(" }");

@@ -4,14 +4,14 @@
 #include <stdio.h>
 
 static void destroyPair(Pair *P, void (*destroyValue)(void*)) {
-  if (destroyValue) (*destroyValue)(P->Value);
+  if (destroyValue) (*destroyValue)(P->second);
   free(P);
 }
 
-static Pair *createPair(char *Key, void *Value) {
+Pair *createPair(void *F, void *S) {
   Pair *P  = (Pair*) malloc(sizeof(Pair));
-  P->Key   = Key;
-  P->Value = Value;
+  P->first   = F;
+  P->second  = S;
   return P;
 }
 
@@ -32,14 +32,14 @@ static Pair *hashGetPair(Hash *H, char *Key) {
                     E = endPtrVector(V);
   for (; I != E; ++I) {
     Pair *P = (Pair*) *I;
-    if (!strcmp(Key, P->Key)) return P;
+    if (!strcmp(Key, P->first)) return P;
   }
   return NULL;
 }
 
 static void hashChange(Hash *H, char *Key, void *New) {
   Pair *P = hashGetPair(H, Key);
-  if (P) P->Value = New;
+  if (P) P->second = New;
 }
 
 int hashInsert(Hash *H, char *Key, void *Value) {
@@ -62,7 +62,7 @@ void hashInsertOrChange(Hash *H, char *Key, void *Value) {
 
 void *hashFind(Hash *H, char *Key) {
   Pair *P = hashGetPair(H, Key);
-  if (P) return P->Value;
+  if (P) return P->second;
   return NULL;
 }
 

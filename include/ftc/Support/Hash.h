@@ -9,9 +9,11 @@ typedef struct Hash Hash;
 typedef struct Pair Pair;
 
 struct Pair {
-  char *Key;
-  void *Value;
+  void *first;
+  void *second;
 };
+
+Pair *createPair(void*, void*);
 
 struct Hash {
   PtrVector Pairs;
