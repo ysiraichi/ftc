@@ -20,6 +20,11 @@ void initSymTable(ASTNode*, SymbolTable*);
 SymbolTable *createSymbolTable(ASTNode*, SymbolTable*);
 
 void insertIfEscaped(SymbolTable*, char*);
+Hash *getEscapedVars(SymbolTable*, char*);
+void insertIfEscaped(SymbolTable*, char*);
+int  findEscapedOffset(SymbolTable*, char*, int);
+
+SymbolTable *symTableFindChild(SymbolTable*, ASTNode*);
 
 int ownerIsFunction(SymbolTable*);
 int symTableInsertLocal(SymbolTable*, char*, void*);
