@@ -22,8 +22,8 @@ struct Hash {
 
 int hashInsert(Hash*, char*, void*);
 void hashInsertOrChange(Hash*, char*, void*);
-void *hashFind(Hash*, char*);
-int hashExists(Hash*, char*);
+void *hashFind(Hash*, const char*);
+int hashExists(Hash*, const char*);
 
 void initHash(Hash*);
 Hash *createHash(void);

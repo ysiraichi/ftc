@@ -44,13 +44,13 @@ int symTableInsertLocal(SymbolTable *St, char *Key, void *Value) {
   return symTableInsert(Ptr, Key, Value);
 }
 
-int symTableExistsLocal(SymbolTable *St, char *Key) {
+int symTableExistsLocal(SymbolTable *St, const char *Key) {
   SymbolTable *Ptr = St;
   while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
   return symTableExists(Ptr, Key);
 }
 
-void *symTableFindLocal(SymbolTable *St, char *Key) {
+void *symTableFindLocal(SymbolTable *St, const char *Key) {
   SymbolTable *Ptr = St;
   while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
   return symTableFind(Ptr, Key);
@@ -62,13 +62,13 @@ int symTableInsertGlobal(SymbolTable *St, char *Key, void *Value) {
   return symTableInsert(Ptr, Key, Value);
 }
 
-int symTableExistsGlobal(SymbolTable *St, char *Key) {
+int symTableExistsGlobal(SymbolTable *St, const char *Key) {
   SymbolTable *Ptr = St;
   while (Ptr->Parent) Ptr = Ptr->Parent;
   return symTableExists(Ptr, Key);
 }
 
-void *symTableFindGlobal(SymbolTable *St, char *Key) {
+void *symTableFindGlobal(SymbolTable *St, const char *Key) {
   SymbolTable *Ptr = St;
   while (Ptr->Parent) Ptr = Ptr->Parent;
   return symTableFind(Ptr, Key);
@@ -82,7 +82,7 @@ int symTableInsert(SymbolTable *St, char *Key, void *Value) {
   return hashInsert(&(St->Table), Key, Value);
 }
 
-void *symTableFind(SymbolTable *St, char *Key) {
+void *symTableFind(SymbolTable *St, const char *Key) {
   if (!St) return NULL;
   void *Value = NULL;
   if (!(Value = hashFind(&(St->Table), Key)))
@@ -90,7 +90,7 @@ void *symTableFind(SymbolTable *St, char *Key) {
   return (Type*) Value;
 }
 
-int symTableExists(SymbolTable *St, char *Key) {
+int symTableExists(SymbolTable *St, const char *Key) {
   if (!St) return 0;
   int Exists = 1;
   if (!(Exists = hashExists(&(St->Table), Key)))
@@ -101,7 +101,7 @@ int symTableExists(SymbolTable *St, char *Key) {
 PtrVectorIterator beginSymTable(SymbolTable *St) { return beginHash(&(St->Table)); }
 PtrVectorIterator endSymTable(SymbolTable *St) { return endHash(&(St->Table)); }
 
-Hash *getEscapedVars(SymbolTable *St, char *FName) {
+Hash *getEscapedVars(SymbolTable *St, const char *FName) {
   char Buf[NAME_MAX];
   toEscapedName(Buf, FName);
   return symTableFind(St, Buf);

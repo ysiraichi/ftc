@@ -25,7 +25,7 @@ static PtrVector *hashGetBucket(Hash *H, unsigned B) {
   return &(H->Pool[B]);
 }
 
-static Pair *hashGetPair(Hash *H, char *Key) {
+static Pair *hashGetPair(Hash *H, const char *Key) {
   unsigned Bucket = hashHash(Key);
   PtrVector *V = hashGetBucket(H, Bucket);
   PtrVectorIterator I = beginPtrVector(V),
@@ -37,7 +37,7 @@ static Pair *hashGetPair(Hash *H, char *Key) {
   return NULL;
 }
 
-static void hashChange(Hash *H, char *Key, void *New) {
+static void hashChange(Hash *H, const char *Key, void *New) {
   Pair *P = hashGetPair(H, Key);
   if (P) P->second = New;
 }
@@ -60,13 +60,13 @@ void hashInsertOrChange(Hash *H, char *Key, void *Value) {
   else hashInsert(H, Key, Value);
 }
 
-void *hashFind(Hash *H, char *Key) {
+void *hashFind(Hash *H, const char *Key) {
   Pair *P = hashGetPair(H, Key);
   if (P) return P->second;
   return NULL;
 }
 
-int hashExists(Hash *H, char *Key) {
+int hashExists(Hash *H, const char *Key) {
   Pair *P = hashGetPair(H, Key);
   if (P) return 1;
   return 0;
