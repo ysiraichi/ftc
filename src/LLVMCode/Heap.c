@@ -44,6 +44,7 @@ void registerHeap(SymbolTable *TyTable, LLVMContextRef Con) {
   LLVMStructSetBody(HeapTy, AttrTy, 2, 0); 
 
   Head = LLVMAddGlobal(Module, LLVMPointerType(HeapTy, 0), "global.Head");
+  LLVMSetInitializer(Head, LLVMConstPointerNull(LLVMGetElementType(LLVMTypeOf(Head))));
   LLVMBuildStore(Builder, LLVMConstPointerNull(getHeapPointerType()), Head);
 }
 
@@ -59,7 +60,7 @@ void initHeap(LLVMValueRef Heap, LLVMValueRef Ex, LLVMValueRef Lst) {
   LLVMValueRef ExPtr   = LLVMBuildInBoundsGEP(Builder, Heap, ExPtrIdx, 2, "");
   LLVMValueRef LastPtr = LLVMBuildInBoundsGEP(Builder, Heap, LastPtrIdx, 2, "");
 
-  copyMemory(ExMalloc,  Ex,  Size);
+  copyMemory(ExMalloc, Ex, getSConstInt(Size));
 
   LLVMBuildStore(Builder, ExMalloc, ExPtr);
   LLVMBuildStore(Builder, Lst,      LastPtr);

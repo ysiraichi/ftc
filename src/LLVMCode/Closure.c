@@ -1,4 +1,5 @@
 #include "ftc/LLVMCode/Closure.h"
+#include "ftc/LLVMCode/Translate.h"
 
 #include <string.h>
 
@@ -20,7 +21,7 @@ void registerClosure(SymbolTable *TyTable, LLVMContextRef Con) {
 
   ClosureTy = LLVMStructCreateNamed(Con, Name);
   symTableInsertGlobal(TyTable, Name, ClosureTy);
-  
+
   LLVMTypeRef AttrTy[]  = { 
     LLVMPointerType(RATy, 0),
     LLVMPointerType(LLVMInt8Type(), 0)
@@ -31,20 +32,36 @@ void registerClosure(SymbolTable *TyTable, LLVMContextRef Con) {
 LLVMValueRef createLocalClosure(LLVMBuilderRef Builder, LLVMValueRef Fn, LLVMValueRef RA) {
   LLVMValueRef ClosurePtr = LLVMBuildAlloca(Builder, ClosureTy, "");
 
-  LLVMValueRef DtIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 0, 1)
-  };
-  LLVMValueRef Data = LLVMBuildInBoundsGEP(Builder, ClosurePtr, DtIdx, 2, "");
+  LLVMValueRef Data = getClosureData(Builder, ClosurePtr);
   LLVMBuildStore(Builder, RA, Data);
 
-  LLVMValueRef FnIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 1, 1)
-  };
-  LLVMValueRef ClosureFn = LLVMBuildInBoundsGEP(Builder, ClosurePtr, FnIdx, 2, "");
+  LLVMValueRef ClosureFn = getClosureFunction(Builder, ClosurePtr);
   LLVMValueRef FnIntPtr  = LLVMBuildBitCast(Builder, Fn, LLVMPointerType(LLVMInt8Type(), 0), "");
   LLVMBuildStore(Builder, FnIntPtr, ClosureFn);
 
   return ClosurePtr;
+}
+
+LLVMValueRef getClosureData(LLVMBuilderRef Builder, LLVMValueRef Closure) {
+  LLVMValueRef DtIdx[] = { getSConstInt(0), getSConstInt(0) };
+  return LLVMBuildInBoundsGEP(Builder, Closure, DtIdx, 2, "");
+}
+
+LLVMValueRef getClosureFunction(LLVMBuilderRef Builder, LLVMValueRef Closure) {
+  LLVMValueRef FnIdx[] = { getSConstInt(0), getSConstInt(1) };
+  return LLVMBuildInBoundsGEP(Builder, Closure, FnIdx, 2, "");
+}
+
+LLVMValueRef callClosure(LLVMBuilderRef Builder, LLVMTypeRef FunctionType, LLVMValueRef Closure, LLVMValueRef *Params, unsigned Count) {
+  LLVMValueRef DataRef = getClosureData(Builder, Closure);
+  LLVMValueRef FnPtr   = getClosureFunction(Builder, Closure);
+
+  LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
+  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "");
+
+  insertNewRA(LLVMBuildLoad(Builder, DataRef, ""));
+  LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, Params, Count, "");
+  finalizeExecutionRA();
+
+  return CallValue;
 }

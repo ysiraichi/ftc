@@ -15,16 +15,22 @@ void toValName     (char*, char*);
 void toStructName  (char*, char*);
 void toFunctionName(char*, char*);
 
-void        *getAliasValue(SymbolTable*, char*, void (*)(char*,char*), void *(*)(SymbolTable*,char*));
-LLVMTypeRef  getLLVMTypeFromType(SymbolTable*, Type*);
 
 LLVMValueRef translateExpr(SymbolTable*, SymbolTable*, ASTNode*);
 void         translateDecl(SymbolTable*, SymbolTable*, ASTNode*);
 
 LLVMValueRef toDynamicMemory(LLVMValueRef);
 LLVMValueRef getEscapedVar(SymbolTable*, Type*, ASTNode*); 
-
 LLVMValueRef getSConstInt(unsigned long long);
-LLVMValueRef getStructNthValue(LLVMBuilderRef, LLVMValueRef, int);
+
+char *pickInsertAlias(SymbolTable*, char*, void (*)(char*,char*), int (*)(SymbolTable*,const char*));
+void *resolveAliasId(SymbolTable*, char*, void (*)(char*,char*), void* (*)(SymbolTable*,const char*));
+void copyMemory(LLVMValueRef, LLVMValueRef, LLVMValueRef);
+
+int  getLLVMValueTypeKind(LLVMValueRef);
+int  getLLVMElementTypeKind(LLVMValueRef);
+
+LLVMTypeRef getLLVMTypeFromType(SymbolTable*, Type*);
+LLVMTypeRef toTransitionType(LLVMTypeRef);
 
 #endif

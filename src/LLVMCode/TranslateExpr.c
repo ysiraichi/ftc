@@ -5,29 +5,30 @@
 
 extern LLVMModuleRef  Module;
 extern LLVMBuilderRef Builder;
-extern int BBCount, GVCount;
 
 static LLVMValueRef 
 translateIntLit(ASTNode *Node) {
-  return LLVMConstInt(LLVMInt32Type(), *((int*)Node->Value), 1); 
+  LLVMValueRef Container = LLVMBuildAlloca(Builder, LLVMInt32Type(), "");
+  LLVMBuildStore(Builder, getSConstInt(*((int*)Node->Value)), Container);
+  return Container;
 }
 
 static LLVMValueRef 
 translateFloatLit(ASTNode *Node) {
-  return LLVMConstReal(LLVMFloatType(), *((float*)Node->Value));
+  LLVMValueRef Container = LLVMBuildAlloca(Builder, LLVMFloatType(), "");
+  LLVMBuildStore(Builder, LLVMConstReal(LLVMFloatType(), *((float*)Node->Value)), Container);
+  return Container;
 }
 
 static LLVMValueRef 
 translateStringLit(ASTNode *Node) {
   int Length = strlen(Node->Value);
-  char Buf[NAME_MAX];
-  sprintf(Buf, "global.%d", GVCount++);
 
-  LLVMValueRef GlobVar = LLVMAddGlobal(Module, LLVMArrayType(LLVMInt8Type(), Length+1), Buf);
+  LLVMValueRef GlobVar = LLVMAddGlobal(Module, LLVMArrayType(LLVMInt8Type(), Length+1), "global.var");
   LLVMSetInitializer(GlobVar, LLVMConstString(Node->Value, Length, 0));
 
-  LLVMValueRef LocalVar = LLVMBuildAlloca(Builder, LLVMArrayType(LLVMInt8Type(), Length+1), "");
-  copyMemory(LocalVar, GlobVar, Length);
+  LLVMValueRef LocalVar = LLVMBuildAlloca(Builder, LLVMPointerType(LLVMInt8Type(), Length+1), "");
+  copyMemory(LocalVar, GlobVar, getSConstInt(Length));
   return LocalVar;
 }
 
@@ -35,20 +36,17 @@ static LLVMValueRef
 translateIdLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   Type *IdType = (Type*) symTableFind(ValTable, Node->Value);
   LLVMValueRef IdValue;
+
   if (IdType->EscapedLevel > 0) {
     LLVMTypeRef LLVMType = getLLVMTypeFromType(TyTable, IdType);
-    LLVMValueRef Value = getEscapedVar(ValTable, IdType, Node);
-    IdValue = LLVMBuildBitCast(Builder, Value, LLVMType, "");
+    LLVMValueRef EVPtr   = getEscapedVar(ValTable, IdType, Node);
+    LLVMValueRef EVLoad  = LLVMBuildLoad(Builder, EVPtr, "");
+
+    IdValue = LLVMBuildBitCast(Builder, EVLoad, LLVMType, "");
   } else {
-    char BaseName[NAME_MAX], *Name;
-    toValName(BaseName, Node->Value);
-    Name = (char*) symTableFind(ValTable, BaseName);
-    IdValue = symTableFind(ValTable, Name); 
+    IdValue = resolveAliasId(TyTable, Node->Value, &toValName, &symTableFindLocal);
   }
 
-  LLVMTypeRef IdElemType = LLVMGetElementType(LLVMTypeOf(IdValue));
-  if (LLVMGetTypeKind(IdElemType) == LLVMIntegerTypeKind || LLVMGetTypeKind(IdElemType) == LLVMFloatTypeKind)
-    IdValue = LLVMBuildLoad(Builder, IdValue, "");
   return IdValue;
 }
 
@@ -59,26 +57,28 @@ translateRecAccessLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Nod
   LLVMValueRef Record     = translateExpr(TyTable, ValTable, Lval);
   LLVMTypeRef  RecTypeRef = LLVMGetElementType(LLVMTypeOf(Record));
 
-  const char  *Buf = LLVMGetStructName(RecTypeRef); 
-  char         TypeName[NAME_MAX];
+  if (LLVMGetTypeKind(RecTypeRef) == LLVMPointerTypeKind)
+    RecTypeRef = LLVMGetElementType(RecTypeRef);
+
+  /* Get struct's name. */
+  const char *Buf = LLVMGetStructName(RecTypeRef); 
+  char TypeName[NAME_MAX];
   strcpy(TypeName, Buf);
 
+  /* Get struct's field. */
   Type      *RecType = (Type*) symTableFind(TyTable, TypeName);
-  Hash      *H       = (Hash*) RecType->Val;
-  PtrVector *V       = &(H->Pairs);
+  Hash      *Fields  = (Hash*) RecType->Val;
+  PtrVector *V       = &(Fields->Pairs);
 
+  /* Get the right struct's field. */
   unsigned Count = 0;
   for (Count = 0; Count < V->Size; ++Count) {
     Pair *P = (Pair*) ptrVectorGet(V, Count);
     if (!strcmp(P->first, Node->Value)) break;
   }
 
-  LLVMValueRef Idx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), Count, 1)
-  };
-
-  return LLVMBuildGEP(Builder, Record, Idx, 2, "");
+  LLVMValueRef Idx[] = { getSConstInt(0), getSConstInt(Count) };
+  return LLVMBuildInBoundsGEP(Builder, Record, Idx, 2, "");
 }
 
 static LLVMValueRef 
@@ -88,8 +88,8 @@ translateArrAccessLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Nod
 
   LLVMValueRef Array  = translateExpr(TyTable, ValTable, Lval);
   LLVMValueRef IndVal = translateExpr(TyTable, ValTable, Index);
-  LLVMValueRef Idx[] = { LLVMConstInt(LLVMInt32Type(), 0, 1), IndVal };
-  return LLVMBuildGEP(Builder, Array, Idx, 2, ""); 
+  LLVMValueRef Idx[] = { getSConstInt(0), IndVal };
+  return LLVMBuildInBoundsGEP(Builder, Array, Idx, 2, ""); 
 }
 
 static LLVMValueRef
@@ -158,21 +158,20 @@ translateBinOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   ASTNode *NodeE1 = (ASTNode*) ptrVectorGet(&(Node->Child), 0),
           *NodeE2 = (ASTNode*) ptrVectorGet(&(Node->Child), 0);
 
-  LLVMValueRef ValueE1 = translateExpr(TyTable, ValTable, NodeE1),
-               ValueE2 = translateExpr(TyTable, ValTable, NodeE2);
+  LLVMValueRef ValueE1Ptr = translateExpr(TyTable, ValTable, NodeE1),
+               ValueE2Ptr = translateExpr(TyTable, ValTable, NodeE2);
 
-  char Buf[] = "strcmp";
-  LLVMValueRef StrCmpFn = symTableFindGlobal(ValTable, Buf);
+  LLVMValueRef ValueE1 = LLVMBuildLoad(Builder, ValueE1Ptr, ""),
+               ValueE2 = LLVMBuildLoad(Builder, ValueE2Ptr, "");
+
+  LLVMValueRef StrCmpFn = symTableFindGlobal(ValTable, "strcmp");
   
   switch (LLVMGetTypeKind(LLVMTypeOf(ValueE1))) {
     case LLVMIntegerTypeKind: return translateIntBinOp   (Node->Kind, ValueE1, ValueE2);
     case LLVMFloatTypeKind:   return translateFloatBinOp (Node->Kind, ValueE1, ValueE2);
-    case LLVMPointerTypeKind: 
-      {
-        if (LLVMGetTypeKind(LLVMGetElementType(LLVMTypeOf(ValueE1))) == LLVMStructTypeKind)
-          return translateStructBinOp(Node->Kind, ValueE1, ValueE2);
-        return translateStringBinOp(Node->Kind, StrCmpFn, ValueE1, ValueE2);
-      }
+    case LLVMStructTypeKind:  return translateStructBinOp(Node->Kind, ValueE1, ValueE2);
+    case LLVMPointerTypeKind: return translateStringBinOp(Node->Kind, StrCmpFn, ValueE1, ValueE2);
+
     default: return NULL;
   }
 }
@@ -181,8 +180,11 @@ static LLVMValueRef
 translateNegOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   ASTNode *Expr = (ASTNode*) ptrVectorGet(&(Node->Child), 0);
 
-  LLVMValueRef ExprVal = translateExpr(TyTable, ValTable, Expr);
-  return LLVMBuildNeg(Builder, ExprVal, "");
+  LLVMValueRef ExprPtr  = translateExpr(TyTable, ValTable, Expr);
+  LLVMValueRef ExprLoad = LLVMBuildLoad(Builder, ExprPtr, "");
+  LLVMBuildNeg (Builder, ExprLoad, "");
+
+  return ExprPtr;
 }
 
 static LLVMValueRef
@@ -194,13 +196,8 @@ translateLetExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   return translateExpr(TyTable_, ValTable_, ptrVectorGet(&(Node->Child), 1));
 }
 
-static void createBasicBlockName(char *Dst, const char *Prefix) {
-  sprintf(Dst, "%s%d", Prefix, BBCount++);
-}
-
 static LLVMValueRef
 translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  char BBName[NAME_MAX];
   ASTNode *CondNode = (ASTNode*) ptrVectorGet(&(Node->Child), 0),
           *ThenNode = (ASTNode*) ptrVectorGet(&(Node->Child), 1),
           *ElseNode = (ASTNode*) ptrVectorGet(&(Node->Child), 2);
@@ -211,15 +208,11 @@ translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
   // Creating the BasicBlocks that will be used.
   LLVMBasicBlockRef TrueBB, FalseBB, EndBB;
 
-  createBasicBlockName(BBName, "if.then.");
-  TrueBB = LLVMAppendBasicBlock(ThisFn, BBName);
-  createBasicBlockName(BBName, "if.end.");
-  EndBB = LLVMAppendBasicBlock(ThisFn, BBName);
+  TrueBB = LLVMAppendBasicBlock(ThisFn, "if.then");
+  EndBB  = LLVMAppendBasicBlock(ThisFn, "if.end");
 
-  if (ElseNode) {
-    createBasicBlockName(BBName, "if.else.");
-    FalseBB = LLVMAppendBasicBlock(ThisFn, BBName);
-  } else FalseBB = EndBB;
+  if (ElseNode) FalseBB = LLVMAppendBasicBlock(ThisFn, "if.else");
+  else FalseBB = EndBB;
 
   // Creating the conditional branch.
   LLVMValueRef CondValue = translateExpr(TyTable, ValTable, CondNode);
@@ -240,8 +233,7 @@ translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
 
   LLVMPositionBuilderAtEnd(Builder, EndBB);
   if (ElseNode) {
-    LLVMValueRef PhiNode = LLVMBuildPhi
-      (Builder, LLVMGetElementType(LLVMTypeOf(TrueValue)), "");
+    LLVMValueRef PhiNode = LLVMBuildPhi(Builder, LLVMTypeOf(TrueValue), "");
     // Adding incoming to phi-node.
     LLVMValueRef      Values[] = { TrueValue, FalseValue };
     LLVMBasicBlockRef Blocks[] = { TrueBB,    FalseBB };
@@ -258,31 +250,58 @@ translateFunCallExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node)
   ASTNode *ExprNode   = (ASTNode*) ptrVectorGet(V, 0),
           *ParamsNode = (ASTNode*) ptrVectorGet(V, 1);
 
+  LLVMTypeRef ReturnType  = toTransitionType(getLLVMTypeFromType(TyTable, Node->Value)),
+              *ParamsType = NULL, FunctionType;
+
   unsigned Count;
   LLVMValueRef ParamsVal[ParamsNode->Child.Size];
   for (Count = 0; Count < ParamsNode->Child.Size; ++Count) {
-    ParamsVal[Count] = translateExpr(TyTable, ValTable, Node);
+    LLVMValueRef ExprVal = translateExpr(TyTable, ValTable, Node);
+
+    LLVMTypeRef ExprType = LLVMGetElementType(LLVMTypeOf(ExprVal));
+    switch (LLVMGetTypeKind(ExprType)) {
+      case LLVMIntegerTypeKind:
+      case LLVMFloatTypeKind:
+      case LLVMPointerTypeKind: ExprVal = LLVMBuildLoad(Builder, ExprVal, ""); break;
+
+      default: break;
+    }
+
+    ParamsVal[Count]  = ExprVal;
+
+    if (!ParamsType) 
+      ParamsType = (LLVMTypeRef*) malloc(sizeof(LLVMTypeRef) * ParamsNode->Child.Size);
+    ParamsType[Count] = LLVMTypeOf(ExprVal);
   }
 
-  LLVMTypeRef FunctionType = (LLVMTypeRef) getAliasValue(ValTable, Node->Value, &toFunctionName, &symTableFindGlobal);
+  FunctionType = LLVMFunctionType(ReturnType, ParamsType, Count, 0);
+  FunctionType = LLVMPointerType(FunctionType, 0);
+
   LLVMValueRef Closure = translateExpr(TyTable, ValTable, ExprNode);
 
-  LLVMValueRef DtIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 0, 1)
-  };
-  LLVMValueRef DataRef = LLVMBuildInBoundsGEP(Builder, Closure, DtIdx, 2, "");
+  LLVMValueRef DataRef = getClosureData(Builder, Closure);
+  LLVMValueRef FnPtr   = getClosureFunction(Builder, Closure);
 
-  LLVMValueRef FnIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 1, 1)
-  };
-  LLVMValueRef FnPtr = LLVMBuildInBoundsGEP(Builder, Closure, FnIdx, 2, "");
-  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnPtr, FunctionType, "");
+  LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
+  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "");
 
   insertNewRA(LLVMBuildLoad(Builder, DataRef, ""));
   LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, ParamsVal, Count, "");
   finalizeExecutionRA();
+
+  switch (getLLVMValueTypeKind(CallValue)) {
+    case LLVMIntegerTypeKind:
+    case LLVMFloatTypeKind:
+    case LLVMPointerTypeKind:
+      {
+        if (getLLVMValueTypeKind(CallValue) == LLVMPointerTypeKind &&
+            getLLVMElementTypeKind(CallValue) == LLVMStructTypeKind) 
+          break;
+        LLVMValueRef PtrMem = LLVMBuildAlloca(Builder, LLVMTypeOf(CallValue), "");
+        LLVMBuildStore(Builder, CallValue, PtrMem);
+        return PtrMem;
+      }
+  }
   return CallValue;
 }
 
@@ -311,15 +330,11 @@ translateArrayExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   LLVMTargetDataRef DataRef = LLVMCreateTargetData(LLVMGetDataLayout(Module));
   unsigned long long Size = LLVMStoreSizeOfType(DataRef, ArrayType);
 
-  char BBName[NAME_MAX];
   LLVMBasicBlockRef InitBB, MidBB, EndBB;
 
-  createBasicBlockName(BBName, "for.init");
-  InitBB = LLVMAppendBasicBlock(ThisFn, BBName);
-  createBasicBlockName(BBName, "for.end");
-  EndBB = LLVMAppendBasicBlock(ThisFn, BBName);
-  createBasicBlockName(BBName, "for.mid");
-  MidBB = LLVMAppendBasicBlock(ThisFn, BBName);
+  InitBB = LLVMAppendBasicBlock(ThisFn, "for.init");
+  EndBB  = LLVMAppendBasicBlock(ThisFn, "for.end");
+  MidBB  = LLVMAppendBasicBlock(ThisFn, "for.mid");
 
   LLVMBuildBr(Builder, InitBB);
 
@@ -333,7 +348,7 @@ translateArrayExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   LLVMValueRef TheValue = LLVMBuildLoad(Builder, InitVal, ""); 
   LLVMValueRef ElemIdx[] = { LLVMConstInt(LLVMInt32Type(), 0, 1), CurrentCounter };
   LLVMValueRef Elem = LLVMBuildInBoundsGEP(Builder, ArrayVal, ElemIdx, 2, "");
-  copyMemory(Elem, TheValue, Size); 
+  copyMemory(Elem, TheValue, getSConstInt(Size)); 
   LLVMBuildBr(Builder, InitBB);
 
   LLVMPositionBuilderAtEnd(Builder, EndBB);
@@ -356,13 +371,11 @@ translateRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
     LLVMTargetDataRef DataRef = LLVMCreateTargetData(LLVMGetDataLayout(Module));
     unsigned long long Size = LLVMStoreSizeOfType(DataRef, LLVMStructGetTypeAtIndex(RecordType, I));
 
-    LLVMValueRef ElemIdx[] = {
-      LLVMConstInt(LLVMInt32Type(), 0, 1),   
-      LLVMConstInt(LLVMInt32Type(), I, 1)   
-    };
-    LLVMValueRef ElemI = LLVMBuildInBoundsGEP(Builder, RecordVal, ElemIdx, 2, "");
-    LLVMValueRef FieldExpr = translateExpr(TyTable, ValTable, ptrVectorGet(&(FieldNode->Child), I));
-    copyMemory(ElemI, FieldExpr, Size);
+    LLVMValueRef ElemIdx[] = { getSConstInt(0), getSConstInt(I) };
+    LLVMValueRef ElemI     = LLVMBuildInBoundsGEP(Builder, RecordVal, ElemIdx, 2, "");
+    LLVMValueRef FieldPtr  = translateExpr(TyTable, ValTable, ptrVectorGet(&(FieldNode->Child), I));
+    LLVMValueRef FieldLoad = LLVMBuildLoad(Builder, FieldPtr, "");
+    copyMemory(ElemI, FieldLoad, getSConstInt(Size));
   }
   return RecordVal; 
 }

@@ -11,6 +11,8 @@ void registerActivationRecord(SymbolTable*, LLVMContextRef);
 void putRAHeadAhead(LLVMValueRef);
 void returnRAHead();
 
-LLVMValueRef createActivationRecord(LLVMBuilderRef, SymbolTable*, ASTNode*);
+LLVMValueRef createActivationRecord(LLVMBuilderRef, SymbolTable*, const char*);
+LLVMValueRef createCompleteActivationRecord(LLVMBuilderRef, Hash*);
+LLVMValueRef createDummyActivationRecord(LLVMBuilderRef);
 
 #endif

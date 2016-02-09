@@ -10,4 +10,9 @@ void registerClosure(SymbolTable*, LLVMContextRef);
 
 LLVMValueRef createLocalClosure(LLVMBuilderRef, LLVMValueRef, LLVMValueRef);
 
+LLVMValueRef getClosureData(LLVMBuilderRef, LLVMValueRef);
+LLVMValueRef getClosureFunction(LLVMBuilderRef, LLVMValueRef);
+
+LLVMValueRef callClosure(LLVMBuilderRef, LLVMTypeRef, LLVMValueRef, LLVMValueRef*, unsigned);
+
 #endif

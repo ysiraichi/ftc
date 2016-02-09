@@ -35,35 +35,8 @@ void registerActivationRecord(SymbolTable *TyTable, LLVMContextRef Con) {
   LLVMStructSetBody(RATy, AttrTy, 2, 0);
 
   RAHead = LLVMAddGlobal(Module, getRAPointerType(), "global.RAHead");
+  LLVMSetInitializer(RAHead, LLVMConstPointerNull(LLVMGetElementType(LLVMTypeOf(RAHead))));
   LLVMBuildStore(Builder, LLVMConstPointerNull(getRAPointerType()), RAHead);
-}
-
-LLVMValueRef createActivationRecord(LLVMBuilderRef Builder, SymbolTable *St, ASTNode *Node) {
-  Hash *EscapedVars = getEscapedVars(St, Node->Value);
-
-  // Malloc the RA struct.
-  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, "");
-
-  LLVMValueRef EVIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 0, 1)
-  };
-  LLVMValueRef EscVarPtr   = LLVMBuildInBoundsGEP(Builder, MallocPtr, EVIdx, 2, "");
-
-  // Malloc N pointers (escaping variables).
-  LLVMValueRef EVMallocPtr = LLVMBuildArrayMalloc(Builder, LLVMPointerType(LLVMInt8Type(), 0), 
-      LLVMConstInt(LLVMInt32Type(), EscapedVars->Pairs.Size, 1), "");
-  LLVMBuildStore(Builder, EVMallocPtr, EscVarPtr);
-
-  LLVMValueRef SlIdx[] = {
-    LLVMConstInt(LLVMInt32Type(), 0, 1),
-    LLVMConstInt(LLVMInt32Type(), 1, 1)
-  };
-  LLVMValueRef StaticLink = LLVMBuildInBoundsGEP(Builder, MallocPtr, SlIdx, 2, "");
-  LLVMValueRef HeadLoad   = LLVMBuildLoad(Builder, RAHead, "");
-  LLVMBuildStore(Builder, HeadLoad, StaticLink);
-
-  return MallocPtr;
 }
 
 void putRAHeadAhead(LLVMValueRef NewRA) {
@@ -76,4 +49,72 @@ void returnRAHead() {
   LLVMValueRef RANext   = LLVMBuildInBoundsGEP(Builder, RAHeadLd, Idx, 2, "");
   LLVMValueRef RANextLd = LLVMBuildLoad(Builder, RANext, "");
   LLVMBuildStore(Builder, RANextLd, RAHead);
+}
+
+LLVMValueRef createActivationRecord(LLVMBuilderRef Builder, SymbolTable *St, const char *FName) {
+  Hash *EscapedVars = getEscapedVars(St, FName);
+
+  // Malloc the RA struct.
+  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, "");
+
+  LLVMValueRef EVIdx[]   = { getSConstInt(0), getSConstInt(0) };
+  LLVMValueRef EscVarPtr   = LLVMBuildInBoundsGEP(Builder, MallocPtr, EVIdx, 2, "");
+
+  // Malloc N pointers (escaping variables).
+  LLVMValueRef EVMallocPtr = LLVMBuildArrayMalloc(Builder, LLVMPointerType(LLVMInt8Type(), 0), 
+      LLVMConstInt(LLVMInt32Type(), EscapedVars->Pairs.Size, 1), "");
+  LLVMBuildStore(Builder, EVMallocPtr, EscVarPtr);
+
+  LLVMValueRef SlIdx[] = { getSConstInt(0), getSConstInt(1) };
+  LLVMValueRef StaticLink = LLVMBuildInBoundsGEP(Builder, MallocPtr, SlIdx, 2, "");
+  LLVMValueRef HeadLoad   = LLVMBuildLoad(Builder, RAHead, "");
+  LLVMBuildStore(Builder, HeadLoad, StaticLink);
+
+  return MallocPtr;
+}
+
+LLVMValueRef createCompleteActivationRecord(LLVMBuilderRef Builder, Hash *EscapedVars) {
+  // Malloc the RA struct.
+  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, "");
+
+  LLVMValueRef EVIdx[]   = { getSConstInt(0), getSConstInt(0) };
+  LLVMValueRef EscVarPtr   = LLVMBuildInBoundsGEP(Builder, MallocPtr, EVIdx, 2, "");
+
+  // Malloc N pointers (escaping variables).
+  LLVMValueRef EVMallocPtr = LLVMBuildArrayMalloc(Builder, LLVMPointerType(LLVMInt8Type(), 0), 
+      LLVMConstInt(LLVMInt32Type(), EscapedVars->Pairs.Size, 1), "");
+  LLVMBuildStore(Builder, EVMallocPtr, EscVarPtr);
+
+  unsigned Count;
+  for (Count = 0; Count < EscapedVars->Pairs.Size; ++Count) {
+    Pair *P = (Pair*) ptrVectorGet(&(EscapedVars->Pairs), Count);
+    LLVMValueRef ClosurePtr = (LLVMValueRef) P->second;
+
+    LLVMValueRef ElemIdx[] = { getSConstInt(0), getSConstInt(Count) };
+    LLVMValueRef ElemPtr   = LLVMBuildInBoundsGEP(Builder, EVMallocPtr, ElemIdx, 2, "");
+    LLVMValueRef ClosureI8 = LLVMBuildBitCast(Builder, ClosurePtr, LLVMPointerType(LLVMInt8Type(), 0), "");
+    LLVMBuildStore(Builder, ClosureI8, ElemPtr);
+  }
+
+  LLVMValueRef SlIdx[] = { getSConstInt(0), getSConstInt(1) };
+  LLVMValueRef StaticLink = LLVMBuildInBoundsGEP(Builder, MallocPtr, SlIdx, 2, "");
+  LLVMValueRef HeadLoad   = LLVMBuildLoad(Builder, RAHead, "");
+  LLVMBuildStore(Builder, HeadLoad, StaticLink);
+
+  return MallocPtr;
+}
+
+LLVMValueRef createDummyActivationRecord(LLVMBuilderRef Builder) {
+  // Malloc the RA struct.
+  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, "");
+
+  LLVMValueRef EVIdx[]   = { getSConstInt(0), getSConstInt(0) };
+  LLVMValueRef EscVarPtr = LLVMBuildInBoundsGEP(Builder, MallocPtr, EVIdx, 2, "");
+  LLVMBuildStore(Builder, LLVMConstPointerNull(LLVMGetElementType(LLVMTypeOf(EscVarPtr))), EscVarPtr);
+
+  LLVMValueRef SlIdx[] = { getSConstInt(0), getSConstInt(1) };
+  LLVMValueRef StaticLink = LLVMBuildInBoundsGEP(Builder, MallocPtr, SlIdx, 2, "");
+  LLVMBuildStore(Builder, LLVMConstPointerNull(LLVMGetElementType(LLVMTypeOf(StaticLink))), StaticLink);
+
+  return MallocPtr;
 }
