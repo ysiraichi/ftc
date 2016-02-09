@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void toEscapedName(char *Dst, char *FunName) {
+void toEscapedName(char *Dst, const char *FunName) {
   sprintf(Dst, "escaped.%s", FunName);
 }
 
@@ -40,7 +40,7 @@ SymbolTable *symTableFindChild(SymbolTable *St, ASTNode *Owner) {
 
 int symTableInsertLocal(SymbolTable *St, char *Key, void *Value) {
   SymbolTable *Ptr = St;
-  while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
+  while (Ptr->Parent && !ownerIsFunction(Ptr)) Ptr = Ptr->Parent;
   return symTableInsert(Ptr, Key, Value);
 }
 
@@ -52,7 +52,8 @@ int symTableExistsLocal(SymbolTable *St, const char *Key) {
 
 void *symTableFindLocal(SymbolTable *St, const char *Key) {
   SymbolTable *Ptr = St;
-  while (Ptr->Parent && !ownerIsFunction(St)) Ptr = Ptr->Parent;
+  while (Ptr->Parent && !ownerIsFunction(Ptr)) Ptr = Ptr->Parent;
+  printf("SymbolTable: Searching for '%s' at %p.\n", Key, (void*)Ptr);
   return symTableFind(Ptr, Key);
 }
 
@@ -118,7 +119,7 @@ void insertIfEscaped(SymbolTable *St, char *Key) {
   if (hashExists(&(Ptr->Table), Key)) return;   // has not escaped.
 
   Type *KeyType = symTableFind(St, Key);
-  KeyType->EscapedLevel = 1;
+  KeyType->EscapedLevel = 0;
   Exists = 0;
   do {
     Exists |= hashExists(&(Ptr->Table), Key);

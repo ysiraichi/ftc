@@ -14,7 +14,7 @@ struct SymbolTable {
   ASTNode *Owner;
 };
 
-void toEscapedName(char*, char*);
+void toEscapedName(char*, const char*);
 
 void initSymTable(ASTNode*, SymbolTable*);
 SymbolTable *createSymbolTable(ASTNode*, SymbolTable*);
