@@ -6,16 +6,17 @@
 #include <stdio.h>
 
 /* <function> */
-static void simplifyType(Type **Ty) {
-  if (!(*Ty)) return;
-  if ((*Ty)->Kind != SeqTy) return;
+static Type *simplifyType(Type *Ty) {
+  if (!Ty) return NULL;
+  if (Ty->Kind != SeqTy) return Ty;
 
-  PtrVector *V = (PtrVector*) (*Ty)->Val;
-  if (V->Size == 0) (*Ty) = NULL;
+  PtrVector *V = (PtrVector*) Ty->Val;
+  if (V->Size == 0) return Ty;
   else if (V->Size == 1) {
     Type *TheTy = ptrVectorGet(V, 0);
-    (*Ty)       = TheTy;
+    return createType(TheTy->Kind, TheTy->Val);
   }
+  return Ty;
 }
 
 /* <function> */
@@ -95,8 +96,6 @@ Type *createType(NodeKind K, void *Ptr) {
 /* <function> */
 Type *createFnType(Type *From, Type *To) {
   Type **TyArr = (Type**) malloc(sizeof(Type*) * 2);
-  if (From) simplifyType(&From);
-  if (To) simplifyType(&To);
   TyArr[0] = From;
   TyArr[1] = To;
   return createType(FunTy, TyArr);
@@ -134,8 +133,8 @@ void destroyType(void *T) {
 
 /* <function> */
 int compareType(Type *One, Type *Two) {
-  simplifyType(&One);
-  simplifyType(&Two);
+  One = simplifyType(One);
+  Two = simplifyType(Two);
 
   /*
      printf("------------------\n");

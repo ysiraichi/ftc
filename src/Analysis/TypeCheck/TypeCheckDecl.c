@@ -194,10 +194,14 @@ static void checkFunDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *N
               *ValTable_ = createSymbolTable(Node, ValTable);
 
   // Preparing structure for escaping variables.
-  char Buf[NAME_MAX];
+  char Buf[NAME_MAX], *EscapedName;
   toEscapedName(Buf, Node->Value);
   Hash *EscapingVar = createHash();
-  symTableInsert(ValTable, Buf, EscapingVar);
+
+  EscapedName = (char*) malloc(sizeof(char) * (strlen(Buf) + 1));
+  strcpy(EscapedName, Buf);
+
+  symTableInsert(ValTable_, EscapedName, EscapingVar);
 
   if (Params) {
     PtrVectorIterator IPar = beginPtrVector(&(Params->Child)),
