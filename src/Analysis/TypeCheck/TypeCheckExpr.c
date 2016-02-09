@@ -179,6 +179,7 @@ checkFunCallExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   FnType = resolveType(TyTable, FnType);
   if (FnType->Kind == FunTy) {
     Type *ArgType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
+    Node->Value = ((Type**)FnType->Val)[1];
     if (typeEqual(TyTable, ((Type**) FnType->Val)[0], ArgType))
       return (Type*) ((Type**) FnType->Val)[1];
     else semError(1, Node, "Arguments do not match the call.");
@@ -275,6 +276,12 @@ checkFieldExprList(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   return createType(RecordTy, Fields);
 }
 
+static Type*
+checkNilExpr(ASTNode *Node) {
+  Node->Value = createType(NilTy, NULL);
+  return Node->Value;
+}
+
 /* <function> */
 Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   if (!Node) return NULL;
@@ -310,7 +317,7 @@ Type *checkExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case RecordExpr:    return checkRecordExpr(TyTable, ValTable, Node);
     case FieldExprList: return checkFieldExprList(TyTable, ValTable, Node);
 
-    case NilExpr: return createType(NilTy, NULL);
+    case NilExpr: return checkNilExpr(Node);
 
     default: return NULL;
   }
