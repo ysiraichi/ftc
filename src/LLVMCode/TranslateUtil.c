@@ -7,15 +7,15 @@ extern LLVMModuleRef  Module;
 extern LLVMBuilderRef Builder;
 
 /* Function: Naming conventions. */
-void toFunctionName(char *Dst, char *TypeName) {
+void toFunctionName(char *Dst, const char *TypeName) {
   sprintf(Dst, "function.%s", TypeName);
 }
 
-void toValName(char *Dst, char *TypeName) {
+void toValName(char *Dst, const char *TypeName) {
   sprintf(Dst, "val.%s", TypeName);
 }
 
-void toStructName(char *Dst, char *TypeName) {
+void toStructName(char *Dst, const char *TypeName) {
   sprintf(Dst, "struct.%s", TypeName);
 }
 
@@ -32,8 +32,19 @@ int getLLVMElementTypeKind(LLVMValueRef Val) {
   return LLVMGetTypeKind(LLVMGetElementType(LLVMTypeOf(Val)));
 }
 
+LLVMValueRef getFunctionFromBuilder(LLVMBuilderRef Builder) {
+  return LLVMGetBasicBlockParent(LLVMGetInsertBlock(Builder));
+}
+
 /* SymbolTable related stuff. */
-void *resolveAliasId(SymbolTable *Table, char *NodeId, void (*toName)(char*,char*), 
+LLVMValueRef getAliasFunction(SymbolTable *Table, char *NodeId, void (*toName)(char*,const char*)) {
+  char Buf[NAME_MAX], *Name;
+  (*toName)(Buf, NodeId);
+  Name = (char*) symTableFind(Table, Buf);
+  return LLVMGetNamedFunction(Module, Name);
+}
+
+void *resolveAliasId(SymbolTable *Table, char *NodeId, void (*toName)(char*,const char*), 
     void *(*tableFind)(SymbolTable*, const char*)) {
   char Buf[NAME_MAX], *Name;
   (*toName)(Buf, NodeId);
@@ -41,17 +52,17 @@ void *resolveAliasId(SymbolTable *Table, char *NodeId, void (*toName)(char*,char
   return (*tableFind)(Table, Name);
 }
 
-char *pickInsertAlias(SymbolTable *Table, char *NodeId, void (*toBaseName)(char*,char*),
+char *pickInsertAlias(SymbolTable *Table, const char *NodeId, void (*toBaseName)(char*,const char*),
     int (*symbolExists)(SymbolTable*, const char*)) {
   int Count = 0;
-  char Buf[NAME_MAX], *BaseName, *Name;
+  char Buf[NAME_MAX], *BaseName = NULL, *Name = NULL;
   do { 
     (*toBaseName)(Buf, NodeId);
     if (!BaseName) {
       BaseName = (char*) malloc(sizeof(char) * strlen(Buf));
       strcpy(BaseName, Buf);
     } 
-    sprintf(Buf, "%s%d", Buf, Count++);
+    sprintf(Buf, "%s.%d", Buf, Count++);
   } while ((*symbolExists)(Table, Buf));
 
   Name = (char*) malloc(sizeof(char) * strlen(Buf));
@@ -118,9 +129,47 @@ void copyMemory(LLVMValueRef To, LLVMValueRef From, LLVMValueRef Length) {
   LLVMBuildCall(Builder, MemCpyFn, Params, 5, "");
 }
 
+LLVMValueRef wrapValue(LLVMValueRef Val) {
+  LLVMTypeRef ValType = LLVMTypeOf(Val);
+  switch (LLVMGetTypeKind(ValType)) {
+    case LLVMIntegerTypeKind:
+    case LLVMFloatTypeKind: 
+    case LLVMPointerTypeKind: 
+      {
+        if (LLVMGetTypeKind(ValType) == LLVMPointerTypeKind &&
+            LLVMGetTypeKind(LLVMGetElementType(ValType)) != LLVMIntegerTypeKind)
+          break;
+        LLVMValueRef Container = LLVMBuildAlloca(Builder, ValType, "wrapped");
+        LLVMBuildStore(Builder, Val, Container);
+        return Container;
+      }
+    default: return Val;
+  }
+  return Val;
+}
+
+LLVMValueRef unWrapValue(LLVMValueRef Val) {
+  LLVMTypeRef ValType = LLVMGetElementType(LLVMTypeOf(Val));
+  switch (LLVMGetTypeKind(ValType)) {
+    case LLVMIntegerTypeKind:
+    case LLVMFloatTypeKind: 
+    case LLVMPointerTypeKind: 
+      {
+        if (LLVMGetTypeKind(ValType) == LLVMPointerTypeKind &&
+            LLVMGetTypeKind(LLVMGetElementType(ValType)) != LLVMIntegerTypeKind)
+          break;
+        LLVMValueRef ValLoad = LLVMBuildLoad(Builder, Val, "unwrapped");
+        return ValLoad;
+      }
+    default: return Val;
+  }
+  return Val;
+}
+
 /* Transition types (function to function) */
-LLVMTypeRef toTransitinType(LLVMTypeRef Ty) {
+LLVMTypeRef toTransitionType(LLVMTypeRef Ty) {
   switch (LLVMGetTypeKind(Ty)) {
+    case LLVMVoidTypeKind:
     case LLVMIntegerTypeKind:
     case LLVMFloatTypeKind: 
     case LLVMPointerTypeKind: return Ty;

@@ -11,9 +11,9 @@
 #include "llvm-c/Core.h"
 #include "llvm-c/Target.h"
 
-void toValName     (char*, char*);
-void toStructName  (char*, char*);
-void toFunctionName(char*, char*);
+void toValName     (char*, const char*);
+void toStructName  (char*, const char*);
+void toFunctionName(char*, const char*);
 
 
 LLVMValueRef translateExpr(SymbolTable*, SymbolTable*, ASTNode*);
@@ -22,9 +22,13 @@ void         translateDecl(SymbolTable*, SymbolTable*, ASTNode*);
 LLVMValueRef toDynamicMemory(LLVMValueRef);
 LLVMValueRef getEscapedVar(SymbolTable*, Type*, ASTNode*); 
 LLVMValueRef getSConstInt(unsigned long long);
+LLVMValueRef getAliasFunction(SymbolTable*, char*, void (*)(char*,const char*));
+LLVMValueRef wrapValue(LLVMValueRef);
+LLVMValueRef unWrapValue(LLVMValueRef);
+LLVMValueRef getFunctionFromBuilder(LLVMBuilderRef);
 
-char *pickInsertAlias(SymbolTable*, char*, void (*)(char*,char*), int (*)(SymbolTable*,const char*));
-void *resolveAliasId(SymbolTable*, char*, void (*)(char*,char*), void* (*)(SymbolTable*,const char*));
+char *pickInsertAlias(SymbolTable*, const char*, void (*)(char*,const char*), int (*)(SymbolTable*,const char*));
+void *resolveAliasId(SymbolTable*, char*, void (*)(char*,const char*), void* (*)(SymbolTable*,const char*));
 void copyMemory(LLVMValueRef, LLVMValueRef, LLVMValueRef);
 
 int  getLLVMValueTypeKind(LLVMValueRef);

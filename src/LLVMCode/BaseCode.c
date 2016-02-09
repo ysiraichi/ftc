@@ -79,9 +79,10 @@ static void addStdFunctions() {
   LLVMAddFunction(Module, "strlen", StrLenType);
 }
 
-static void addPrintFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 6);
-  strcpy(Name, "print");
+static void addPrintFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "print", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 6);
+  strcpy(EscName, "print");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMInt8Type(), 0),
@@ -90,7 +91,10 @@ static void addPrintFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), Params, 2, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "print", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -105,9 +109,10 @@ static void addPrintFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRetVoid(Builder);
 }
 
-static void addGetCharFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 8);
-  strcpy(Name, "getchar");
+static void addGetCharFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "getchar", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 8);
+  strcpy(EscName, "getchar");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMGetTypeByName(Module, "struct.Closure"), 0)
@@ -115,7 +120,10 @@ static void addGetCharFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "getcharTiger", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -141,9 +149,10 @@ static void addGetCharFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, String);
 }
 
-static void addFlushFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 6);
-  strcpy(Name, "flush");
+static void addFlushFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "flush", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 6);
+  strcpy(EscName, "flush");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMGetTypeByName(Module, "struct.Closure"), 0)
@@ -151,7 +160,10 @@ static void addFlushFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "flush", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -167,13 +179,17 @@ static void addFlushFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRetVoid(Builder);
 }
 
-static void addExitFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 5);
-  strcpy(Name, "exit");
+static void addExitFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "exit", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 5);
+  strcpy(EscName, "exit");
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), NULL, 0, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "exitTiger", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -185,9 +201,10 @@ static void addExitFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRetVoid(Builder);
 }
 
-static void addOrdFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 4);
-  strcpy(Name, "ord");
+static void addOrdFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "ord", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 4);
+  strcpy(EscName, "ord");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMInt8Type(), 0)
@@ -195,7 +212,10 @@ static void addOrdFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "ord", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -206,9 +226,10 @@ static void addOrdFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, RetValue);
 }
 
-static void addChrFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 4);
-  strcpy(Name, "chr");
+static void addChrFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "chr", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 4);
+  strcpy(EscName, "chr");
 
   LLVMTypeRef Params[] = {
     LLVMInt32Type()
@@ -216,7 +237,10 @@ static void addChrFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "chr", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -237,9 +261,10 @@ static void addChrFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, String);
 }
 
-static void addSizeFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 5);
-  strcpy(Name, "size");
+static void addSizeFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "size", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 6);
+  strcpy(EscName, "size");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMInt8Type(), 0)
@@ -247,7 +272,10 @@ static void addSizeFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "size", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -259,9 +287,10 @@ static void addSizeFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, RetValue);
 }
 
-static void addSubStringFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 10);
-  strcpy(Name, "substring");
+static void addSubStringFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "substring", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 10);
+  strcpy(EscName, "substring");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMInt8Type(), 0),
@@ -271,7 +300,10 @@ static void addSubStringFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 3, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "substring", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -290,9 +322,10 @@ static void addSubStringFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, NewString);
 }
 
-static void addConcatFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 7);
-  strcpy(Name, "concat");
+static void addConcatFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "concat", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 7);
+  strcpy(EscName, "concat");
 
   LLVMTypeRef Params[] = {
     LLVMPointerType(LLVMInt8Type(), 0),
@@ -301,7 +334,10 @@ static void addConcatFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 2, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "concat", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -329,9 +365,10 @@ static void addConcatFunction(LLVMValueRef RA, Hash *EV) {
   LLVMBuildRet(Builder, NewString);
 }
 
-static void addNotFunction(LLVMValueRef RA, Hash *EV) {
-  char *Name = (char*) malloc(sizeof(char) * 4);
-  strcpy(Name, "not");
+static void addNotFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
+  char *Name    = pickInsertAlias(ValTable, "not", &toValName, &symTableExists),
+       *EscName = (char*) malloc(sizeof(char) * 4);
+  strcpy(EscName, "not");
 
   LLVMTypeRef Params[] = {
     LLVMInt32Type()
@@ -339,7 +376,10 @@ static void addNotFunction(LLVMValueRef RA, Hash *EV) {
 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "not", FType);
-  hashInsert(EV, Name, createLocalClosure(Builder, Function, RA));
+
+  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  hashInsert(EV, EscName, FnClosure);
+  symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
@@ -348,41 +388,41 @@ static void addNotFunction(LLVMValueRef RA, Hash *EV) {
 }
 
 
-void addAllBaseFunctions(LLVMValueRef RA, Hash *EV) {
+void addAllBaseFunctions(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   addStdFunctions();
   addLLVMMemCpyFunction();
 
   LLVMBasicBlockRef MainBB = LLVMGetInsertBlock(Builder);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addPrintFunction    (RA, EV);
+  addPrintFunction    (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addGetCharFunction  (RA, EV);
+  addGetCharFunction  (ValTable, RA, EV);
   
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addFlushFunction    (RA, EV);
+  addFlushFunction    (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addExitFunction     (RA, EV);
+  addExitFunction     (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addOrdFunction      (RA, EV);
+  addOrdFunction      (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addChrFunction      (RA, EV);
+  addChrFunction      (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addSizeFunction     (RA, EV);
+  addSizeFunction     (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addSubStringFunction(RA, EV);
+  addSubStringFunction(ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addConcatFunction   (RA, EV);
+  addConcatFunction   (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
-  addNotFunction      (RA, EV);
+  addNotFunction      (ValTable, RA, EV);
 
   LLVMPositionBuilderAtEnd(Builder, MainBB);
 }

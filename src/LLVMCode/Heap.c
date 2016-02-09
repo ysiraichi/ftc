@@ -57,8 +57,8 @@ void initHeap(LLVMValueRef Heap, LLVMValueRef Ex, LLVMValueRef Lst) {
   LLVMValueRef ExPtrIdx[]   = { getSConstInt(0), getSConstInt(0) };
   LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
 
-  LLVMValueRef ExPtr   = LLVMBuildInBoundsGEP(Builder, Heap, ExPtrIdx, 2, "");
-  LLVMValueRef LastPtr = LLVMBuildInBoundsGEP(Builder, Heap, LastPtrIdx, 2, "");
+  LLVMValueRef ExPtr   = LLVMBuildInBoundsGEP(Builder, Heap, ExPtrIdx, 2, "exec.ra.");
+  LLVMValueRef LastPtr = LLVMBuildInBoundsGEP(Builder, Heap, LastPtrIdx, 2, "last.ra.");
 
   copyMemory(ExMalloc, Ex, getSConstInt(Size));
 
@@ -67,9 +67,9 @@ void initHeap(LLVMValueRef Heap, LLVMValueRef Ex, LLVMValueRef Lst) {
 }
 
 void insertNewRA(LLVMValueRef ExecRA) {
-  LLVMValueRef New = LLVMBuildMalloc(Builder, HeapTy, "");
+  LLVMValueRef New = LLVMBuildMalloc(Builder, HeapTy, "new.ra.");
 
-  LLVMValueRef LastPtr = LLVMBuildLoad(Builder, Head, "");
+  LLVMValueRef LastPtr = LLVMBuildLoad(Builder, Head, "loaded.heap.head");
 
   initHeap(New, ExecRA, LastPtr);
 }

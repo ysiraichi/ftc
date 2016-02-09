@@ -30,7 +30,20 @@ void registerClosure(SymbolTable *TyTable, LLVMContextRef Con) {
 }
 
 LLVMValueRef createLocalClosure(LLVMBuilderRef Builder, LLVMValueRef Fn, LLVMValueRef RA) {
-  LLVMValueRef ClosurePtr = LLVMBuildAlloca(Builder, ClosureTy, "");
+  LLVMValueRef ClosurePtr = LLVMBuildMalloc(Builder, ClosureTy, "LocalClosure");
+
+  LLVMValueRef Data = getClosureData(Builder, ClosurePtr);
+  LLVMBuildStore(Builder, RA, Data);
+
+  LLVMValueRef ClosureFn = getClosureFunction(Builder, ClosurePtr);
+  LLVMValueRef FnIntPtr  = LLVMBuildBitCast(Builder, Fn, LLVMPointerType(LLVMInt8Type(), 0), "");
+  LLVMBuildStore(Builder, FnIntPtr, ClosureFn);
+
+  return ClosurePtr;
+}
+
+LLVMValueRef createLocalClosure_(LLVMBuilderRef Builder, LLVMValueRef Fn, LLVMValueRef RA) {
+  LLVMValueRef ClosurePtr = LLVMBuildAlloca(Builder, ClosureTy, "LocalClosure");
 
   LLVMValueRef Data = getClosureData(Builder, ClosurePtr);
   LLVMBuildStore(Builder, RA, Data);
@@ -57,7 +70,7 @@ LLVMValueRef callClosure(LLVMBuilderRef Builder, LLVMTypeRef FunctionType, LLVMV
   LLVMValueRef FnPtr   = getClosureFunction(Builder, Closure);
 
   LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
-  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "");
+  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "CFunction");
 
   insertNewRA(LLVMBuildLoad(Builder, DataRef, ""));
   LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, Params, Count, "");

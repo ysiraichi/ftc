@@ -20,6 +20,7 @@ LLVMTypeRef getLLVMTypeFromType(SymbolTable *TyTable, Type *Ty) {
   Type *RealType = getRealType(TyTable, Ty);
 
   switch (RealType->Kind) {
+    case AnswerTy: return LLVMVoidType();
     case IntTy:    return LLVMInt32Type();
     case FloatTy:  return LLVMFloatType();
     case StringTy: return LLVMPointerType(LLVMInt8Type(), 0);

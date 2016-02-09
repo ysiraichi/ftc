@@ -52,10 +52,12 @@ void returnRAHead() {
 }
 
 LLVMValueRef createActivationRecord(LLVMBuilderRef Builder, SymbolTable *St, const char *FName) {
+  char Buf[NAME_MAX];
+  sprintf(Buf, "createRA.4.%s", FName);
   Hash *EscapedVars = getEscapedVars(St, FName);
 
   // Malloc the RA struct.
-  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, "");
+  LLVMValueRef MallocPtr = LLVMBuildMalloc(Builder, RATy, Buf);
 
   LLVMValueRef EVIdx[]   = { getSConstInt(0), getSConstInt(0) };
   LLVMValueRef EscVarPtr   = LLVMBuildInBoundsGEP(Builder, MallocPtr, EVIdx, 2, "");

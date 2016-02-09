@@ -6,7 +6,7 @@
 #include "ftc/LLVMCode/Closure.h"
 #include "ftc/LLVMCode/ActivationRecord.h"
 
-void addAllBaseFunctions(LLVMValueRef, Hash*);
+void addAllBaseFunctions(SymbolTable*, LLVMValueRef, Hash*);
 void addAllBaseTypes(SymbolTable*, LLVMContextRef);
 
 #endif

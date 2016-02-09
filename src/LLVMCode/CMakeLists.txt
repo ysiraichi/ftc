@@ -3,7 +3,7 @@ add_library (IRTranslation
   Closure.c
   Heap.c
   BaseCode.c
-  TranslateDecl.c
-  TranslateExpr.c
   TranslateUtil.c
-  TranslateType.c)
+  TranslateType.c
+  TranslateDecl.c
+  TranslateExpr.c)
