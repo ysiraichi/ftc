@@ -10,7 +10,7 @@ execute_process (COMMAND
   llvm-config --cflags 
   OUTPUT_VARIABLE CFLAGS_)
 execute_process (COMMAND 
-  llvm-config --cxxflags --ldflags --libs core --system-libs
+  llvm-config --cxxflags --ldflags 
   OUTPUT_VARIABLE CXXFLAGS_)
 
 string (REPLACE "\n" " " CFLAGS ${CFLAGS_})
