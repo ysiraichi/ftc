@@ -13,16 +13,71 @@
 extern LLVMModuleRef  Module;
 extern LLVMBuilderRef Builder;
 
-static LLVMTypeRef  RATy;
-static LLVMTypeRef  HeapTy;
-static LLVMValueRef Head;
+static LLVMTypeRef  RAType;
+static LLVMTypeRef  HeapType;
+static LLVMValueRef HeapHead;
 
+static void createPopHeapFunction() {
+  // Saving last BasicBlock;
+  LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
+
+  LLVMTypeRef FunctionType = LLVMFunctionType(LLVMVoidType(), NULL, 0, 0);
+
+  LLVMValueRef      Function = LLVMAddFunction(Module, "pop.heap", FunctionType);
+  LLVMBasicBlockRef Entry    = LLVMAppendBasicBlock(Function, "entry");
+  LLVMPositionBuilderAtEnd(Builder, Entry);
+  
+  // Function Body
+  LLVMValueRef HeapHdPtr = LLVMBuildLoad(Builder, HeapHead, "");
+
+  LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
+  LLVMValueRef LastPtr   = LLVMBuildInBoundsGEP(Builder, HeapHdPtr, LastPtrIdx, 2, "heap.last");
+  LLVMValueRef LastPtrLd = LLVMBuildLoad(Builder, LastPtr, "ld.heap.last");
+
+  LLVMBuildStore(Builder, LastPtrLd, HeapHead);
+
+  LLVMBuildRetVoid(Builder);
+
+  // Restoring last BasicBlock
+  LLVMPositionBuilderAtEnd(Builder, OldBB);
+}
+
+static void createPushHeapFunction() {
+  // Saving last BasicBlock;
+  LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
+
+  LLVMTypeRef ParamType    = LLVMPointerType(RAType, 0);
+  LLVMTypeRef FunctionType = LLVMFunctionType(LLVMVoidType(), &ParamType, 1, 0);
+
+  LLVMValueRef      Function = LLVMAddFunction(Module, "push.heap", FunctionType);
+  LLVMBasicBlockRef Entry    = LLVMAppendBasicBlock(Function, "entry");
+  LLVMPositionBuilderAtEnd(Builder, Entry);
+  
+  // Function Body
+  LLVMValueRef HeapMalloc  = LLVMBuildMalloc(Builder, HeapType, "ld.heap.head");
+
+  LLVMValueRef ExPtrIdx[]   = { getSConstInt(0), getSConstInt(0) };
+  LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
+
+  LLVMValueRef ExPtr   = LLVMBuildInBoundsGEP(Builder, HeapMalloc, ExPtrIdx, 2, "heap.exec");
+  LLVMValueRef LastPtr = LLVMBuildInBoundsGEP(Builder, HeapMalloc, LastPtrIdx, 2, "heap.last");
+
+  LLVMBuildStore(Builder, LLVMGetParam(Function, 0), ExPtr);
+  LLVMBuildStore(Builder, LLVMBuildLoad(Builder, HeapHead, "ld.heap.head"), LastPtr);
+
+  LLVMBuildRetVoid(Builder);
+
+  // Restoring last BasicBlock
+  LLVMPositionBuilderAtEnd(Builder, OldBB);
+}
+
+/*---------------------------- Compiler related functions.------------------------------*/
 LLVMTypeRef getHeapPointerType() {
-  return LLVMPointerType(HeapTy, 0);
+  return LLVMPointerType(HeapType, 0);
 }
 
 LLVMValueRef getHeadRA() {
-  LLVMValueRef HeadLd  = LLVMBuildLoad(Builder, Head, "");
+  LLVMValueRef HeadLd  = LLVMBuildLoad(Builder, HeapHead, "");
   LLVMValueRef RAIdx[] = { getSConstInt(0), getSConstInt(0) };
   return LLVMBuildInBoundsGEP(Builder, HeadLd, RAIdx, 2, "");
 }
@@ -32,54 +87,33 @@ void registerHeap(SymbolTable *TyTable, LLVMContextRef Con) {
   Name = (char*) malloc(strlen(Buf) * sizeof(char));
   strcpy(Name, Buf);
 
-  RATy = symTableFindGlobal(TyTable, BufRA);
+  RAType = symTableFindGlobal(TyTable, BufRA);
 
-  HeapTy = LLVMStructCreateNamed(Con, Name);
-  symTableInsertGlobal(TyTable, Name, HeapTy);
+  HeapType = LLVMStructCreateNamed(Con, Name);
+  symTableInsertGlobal(TyTable, Name, HeapType);
 
   LLVMTypeRef AttrTy[]  = { 
-    LLVMPointerType(RATy, 0), 
-    LLVMPointerType(HeapTy, 0)
+    LLVMPointerType(RAType, 0), 
+    LLVMPointerType(HeapType, 0)
   };  
-  LLVMStructSetBody(HeapTy, AttrTy, 2, 0); 
+  LLVMStructSetBody(HeapType, AttrTy, 2, 0); 
 
-  Head = LLVMAddGlobal(Module, LLVMPointerType(HeapTy, 0), "global.Head");
-  LLVMSetInitializer(Head, LLVMConstPointerNull(LLVMGetElementType(LLVMTypeOf(Head))));
-  LLVMBuildStore(Builder, LLVMConstPointerNull(getHeapPointerType()), Head);
+  // Initializing Head of Heap.
+  HeapHead = LLVMAddGlobal(Module, LLVMPointerType(HeapType, 0), "global.HeapHead");
+  LLVMTypeRef HeapHeadConType = LLVMGetElementType(LLVMTypeOf(HeapHead));
+  LLVMSetInitializer(HeapHead, LLVMConstPointerNull(HeapHeadConType));
+
+  // Defining functions.
+  createPushHeapFunction();
+  createPopHeapFunction();
 }
 
-void initHeap(LLVMValueRef Heap, LLVMValueRef Ex, LLVMValueRef Lst) {
-  LLVMTargetDataRef DataRef = LLVMCreateTargetData(LLVMGetDataLayout(Module));
-  unsigned long long Size   = LLVMStoreSizeOfType(DataRef, RATy);
-
-  LLVMValueRef ExMalloc  = LLVMBuildMalloc(Builder, RATy, "");
-
-  LLVMValueRef ExPtrIdx[]   = { getSConstInt(0), getSConstInt(0) };
-  LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
-
-  LLVMValueRef ExPtr   = LLVMBuildInBoundsGEP(Builder, Heap, ExPtrIdx, 2, "exec.ra.");
-  LLVMValueRef LastPtr = LLVMBuildInBoundsGEP(Builder, Heap, LastPtrIdx, 2, "last.ra.");
-
-  copyMemory(ExMalloc, Ex, getSConstInt(Size));
-
-  LLVMBuildStore(Builder, ExMalloc, ExPtr);
-  LLVMBuildStore(Builder, Lst,      LastPtr);
+void heapPush(LLVMValueRef ExecRA) {
+  LLVMValueRef PushFunction = LLVMGetNamedFunction(Module, "push.heap");
+  LLVMBuildCall(Builder, PushFunction, &ExecRA, 1, "");
 }
 
-void insertNewRA(LLVMValueRef ExecRA) {
-  LLVMValueRef New = LLVMBuildMalloc(Builder, HeapTy, "new.ra.");
-
-  LLVMValueRef LastPtr = LLVMBuildLoad(Builder, Head, "loaded.heap.head");
-
-  initHeap(New, ExecRA, LastPtr);
-}
-
-void finalizeExecutionRA() {
-  LLVMValueRef HeapHdPtr    = LLVMBuildLoad(Builder, Head, "");
-
-  LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
-  LLVMValueRef LastPtr   = LLVMBuildInBoundsGEP(Builder, HeapHdPtr, LastPtrIdx, 2, "");
-  LLVMValueRef LastPtrLd = LLVMBuildLoad(Builder, LastPtr, "");
-
-  LLVMBuildStore(Builder, LastPtrLd, Head);
+void heapPop() {
+  LLVMValueRef PopFunction = LLVMGetNamedFunction(Module, "pop.heap");
+  LLVMBuildCall(Builder, PopFunction, NULL, 0, "");
 }

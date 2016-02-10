@@ -302,9 +302,9 @@ translateFunCallExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node)
   LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
   LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "");
 
-  insertNewRA(LLVMBuildLoad(Builder, DataRef, ""));
+  heapPush(LLVMBuildLoad(Builder, DataRef, ""));
   LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, ParamsVal, Count, "");
-  finalizeExecutionRA();
+  heapPop();
 
   switch (getLLVMValueTypeKind(CallValue)) {
     case LLVMIntegerTypeKind:

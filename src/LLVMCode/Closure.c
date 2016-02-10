@@ -72,9 +72,9 @@ LLVMValueRef callClosure(LLVMBuilderRef Builder, LLVMTypeRef FunctionType, LLVMV
   LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
   LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "CFunction");
 
-  insertNewRA(LLVMBuildLoad(Builder, DataRef, ""));
+  heapPush(LLVMBuildLoad(Builder, DataRef, ""));
   LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, Params, Count, "");
-  finalizeExecutionRA();
+  heapPop();
 
   return CallValue;
 }

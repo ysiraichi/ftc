@@ -10,7 +10,8 @@ LLVMValueRef getHeadRA();
 LLVMTypeRef  getHeapPointerType();
 
 void registerHeap(SymbolTable*, LLVMContextRef);
-void insertNewRA(LLVMValueRef);
-void finalizeExecutionRA();
+
+void heapPush(LLVMValueRef);
+void heapPop ();
 
 #endif
