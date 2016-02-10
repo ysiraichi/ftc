@@ -92,7 +92,7 @@ static void addPrintFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), Params, 2, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "print", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -121,7 +121,7 @@ static void addGetCharFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV)
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "getcharTiger", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -161,7 +161,7 @@ static void addFlushFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "flush", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -187,7 +187,7 @@ static void addExitFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMVoidType(), NULL, 0, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "exitTiger", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -213,7 +213,7 @@ static void addOrdFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "ord", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -238,7 +238,7 @@ static void addChrFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "chr", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -273,7 +273,7 @@ static void addSizeFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "size", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -301,7 +301,7 @@ static void addSubStringFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *E
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 3, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "substring", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -335,7 +335,7 @@ static void addConcatFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) 
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMPointerType(LLVMInt8Type(), 0), Params, 2, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "concat", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
@@ -377,7 +377,7 @@ static void addNotFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMTypeRef  FType    = LLVMFunctionType(LLVMInt32Type(), Params, 1, 0);
   LLVMValueRef Function = LLVMAddFunction(Module, "not", FType);
 
-  LLVMValueRef FnClosure = createLocalClosure(Builder, Function, RA);
+  LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
   hashInsert(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 

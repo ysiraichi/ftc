@@ -141,7 +141,7 @@ static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AS
 
     // Activation record and closure created.
     LLVMValueRef ThisRA = createActivationRecord(Builder, ValTable_, FnDeclNode->Value);
-    LLVMValueRef ThisClosure = createLocalClosure(Builder, Function, ThisRA);
+    LLVMValueRef ThisClosure = createClosure(Builder, Function, ThisRA);
 
     // Inserting the function name alias in the hash.
     printf("Translate: Inserted function '%s' into %p.\n", Name, (void*)ValTable);
