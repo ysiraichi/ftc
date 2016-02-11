@@ -54,7 +54,7 @@ static void createPushHeapFunction() {
   LLVMPositionBuilderAtEnd(Builder, Entry);
   
   // Function Body
-  LLVMValueRef HeapMalloc  = LLVMBuildMalloc(Builder, HeapType, "ld.heap.head");
+  LLVMValueRef HeapMalloc  = LLVMBuildMalloc(Builder, HeapType, "heap.malloc");
 
   LLVMValueRef ExPtrIdx[]   = { getSConstInt(0), getSConstInt(0) };
   LLVMValueRef LastPtrIdx[] = { getSConstInt(0), getSConstInt(1) };
@@ -64,6 +64,8 @@ static void createPushHeapFunction() {
 
   LLVMBuildStore(Builder, LLVMGetParam(Function, 0), ExPtr);
   LLVMBuildStore(Builder, LLVMBuildLoad(Builder, HeapHead, "ld.heap.head"), LastPtr);
+
+  LLVMBuildStore(Builder, HeapMalloc, HeapHead);
 
   LLVMBuildRetVoid(Builder);
 

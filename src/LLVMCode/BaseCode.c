@@ -30,6 +30,10 @@ static void addLLVMMemCpyFunction() {
 }
 
 static void addStdFunctions() {
+  /* newline */
+  LLVMValueRef GlbNl = LLVMAddGlobal(Module, LLVMArrayType(LLVMInt8Type(), 2), "new.line");
+  LLVMSetInitializer(GlbNl, LLVMConstString("\n", 1, 0));
+
   /* printf */
   LLVMTypeRef PrintfParams[] = {
     LLVMPointerType(LLVMInt8Type(), 0)
@@ -93,7 +97,7 @@ static void addPrintFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "print", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -103,8 +107,12 @@ static void addPrintFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Args[]     = { LLVMGetParam(Function, 0) };
   LLVMBuildCall(Builder, PrintfFn, Args, 1, "");
 
+  LLVMValueRef GlbNl   = LLVMGetNamedGlobal(Module, "new.line");
+  LLVMValueRef GlbCast = LLVMBuildBitCast(Builder, GlbNl, LLVMPointerType(LLVMInt8Type(), 0), "");
+  LLVMBuildCall(Builder, PrintfFn, &GlbCast, 1, "");
+
   LLVMValueRef ContFn  = LLVMGetParam(Function, 1);
-  callClosure(Builder, getContFunctionPtrType(), ContFn, NULL, 0); 
+  callClosure(getContFunctionPtrType(), ContFn, NULL, 0); 
 
   LLVMBuildRetVoid(Builder);
 }
@@ -122,7 +130,7 @@ static void addGetCharFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV)
   LLVMValueRef Function = LLVMAddFunction(Module, "getcharTiger", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -144,7 +152,7 @@ static void addGetCharFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV)
   LLVMBuildStore(Builder, LLVMConstInt(LLVMInt8Type(), 0, 1), SndCharPtr);
 
   LLVMValueRef Closure = LLVMGetParam(Function, 0);
-  callClosure(Builder, getStringConsumerFunctionPtrType(), Closure, &String, 1);
+  callClosure(getStringConsumerFunctionPtrType(), Closure, &String, 1);
 
   LLVMBuildRet(Builder, String);
 }
@@ -162,7 +170,7 @@ static void addFlushFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "flush", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -174,7 +182,7 @@ static void addFlushFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMBuildCall(Builder, FlushFn, &GlbLoad, 1, "");
 
   LLVMValueRef Closure = LLVMGetParam(Function, 0);
-  callClosure(Builder, getContFunctionPtrType(), Closure, NULL, 0);
+  callClosure(getContFunctionPtrType(), Closure, NULL, 0);
 
   LLVMBuildRetVoid(Builder);
 }
@@ -188,7 +196,7 @@ static void addExitFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "exitTiger", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -214,7 +222,7 @@ static void addOrdFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "ord", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -239,7 +247,7 @@ static void addChrFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "chr", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -274,7 +282,7 @@ static void addSizeFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "size", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -302,7 +310,7 @@ static void addSubStringFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *E
   LLVMValueRef Function = LLVMAddFunction(Module, "substring", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -336,7 +344,7 @@ static void addConcatFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) 
   LLVMValueRef Function = LLVMAddFunction(Module, "concat", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
@@ -378,7 +386,7 @@ static void addNotFunction(SymbolTable *ValTable, LLVMValueRef RA, Hash *EV) {
   LLVMValueRef Function = LLVMAddFunction(Module, "not", FType);
 
   LLVMValueRef FnClosure = createClosure(Builder, Function, RA);
-  hashInsert(EV, EscName, FnClosure);
+  hashInsertOrChange(EV, EscName, FnClosure);
   symTableInsert(ValTable, Name, FnClosure); 
 
   LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
