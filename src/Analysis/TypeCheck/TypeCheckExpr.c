@@ -6,7 +6,7 @@ static Type*
 checkIdLval(SymbolTable *ValTable, ASTNode *Node) {
 
   if (symTableExists(ValTable, Node->Value)) {
-    insertIfEscaped(ValTable, Node->Value);
+    insertIfEscaped(ValTable, Node);
     return symTableFind(ValTable, Node->Value);
   } else semError(1, Node, "Identifier '%s' not declared.", Node->Value);
   // unreachable

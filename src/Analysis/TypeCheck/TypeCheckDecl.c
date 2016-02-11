@@ -170,7 +170,7 @@ static void checkVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *N
   else DeclType = ExprType;
 
   if (typeEqual(TyTable, ExprType, DeclType))
-    symTableInsertOrChange(ValTable, Node->Value, DeclType); 
+    symTableInsertOrChange(ValTable, Node->Value, createType(DeclType->Kind, DeclType->Val)); 
   else semError(1, Node, "Incompatible types of variable '%s'.", Node->Value);
 }
 
