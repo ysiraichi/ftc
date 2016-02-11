@@ -44,6 +44,46 @@ static void createCreateClosureFunction() {
   LLVMPositionBuilderAtEnd(Builder, OldBB);
 }
 
+static void createCopyClosureFunction() {
+  LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
+
+  LLVMTypeRef ParamsType[] = { 
+    LLVMPointerType(ClosureType, 0)
+  };
+  LLVMTypeRef FunctionType = 
+    LLVMFunctionType(LLVMPointerType(ClosureType, 0), ParamsType, 1, 0);
+
+  LLVMValueRef Function   = LLVMAddFunction(Module, "copy.closure", FunctionType);
+  LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
+  LLVMPositionBuilderAtEnd(Builder, Entry);
+  
+  // Function Body
+  LLVMValueRef OldClosure = LLVMGetParam(Function, 0);
+  LLVMValueRef ClosurePtr = LLVMBuildMalloc(Builder, ClosureType, "copy");
+
+  LLVMValueRef OldDataPtr = getClosureData(Builder, OldClosure);
+  LLVMValueRef NewDataPtr = getClosureData(Builder, ClosurePtr);
+  LLVMValueRef NewData = createDummyActivationRecord(Builder);
+  LLVMBuildStore(Builder, NewData, NewDataPtr);
+
+  LLVMValueRef OldData = LLVMBuildLoad(Builder, OldDataPtr, "old.data");
+
+  LLVMValueRef SlIdx[]      = { getSConstInt(0), getSConstInt(1) };
+  LLVMValueRef SlPointerNew = LLVMBuildInBoundsGEP(Builder, NewData, SlIdx, 2, "new.sl");
+  LLVMValueRef SlPointerOld = LLVMBuildInBoundsGEP(Builder, OldData, SlIdx, 2, "old.sl");
+  LLVMValueRef SlPointerOldLd = LLVMBuildLoad(Builder, SlPointerOld, "old.sl.ld");
+  LLVMBuildStore(Builder, SlPointerOldLd, SlPointerNew);
+
+  LLVMValueRef ClosureFn = getClosureFunction(Builder, ClosurePtr);
+  LLVMValueRef OldFnPtr  = getClosureFunction(Builder, OldClosure);
+  LLVMValueRef OldFn     = LLVMBuildLoad(Builder, OldFnPtr, "old.fn");
+  LLVMBuildStore(Builder, OldFn, ClosureFn);
+
+  LLVMBuildRet(Builder, ClosurePtr);
+
+  LLVMPositionBuilderAtEnd(Builder, OldBB);
+}
+
 void registerClosure(SymbolTable *TyTable, LLVMContextRef Con) {
   char *Name, Buf[] = "struct.Closure", RABuf[] = "struct.RA";
   Name = (char*) malloc(strlen(Buf) * sizeof(char));
@@ -62,6 +102,7 @@ void registerClosure(SymbolTable *TyTable, LLVMContextRef Con) {
 
   // Functions
   createCreateClosureFunction();
+  createCopyClosureFunction();
 }
 
 LLVMValueRef createClosure(LLVMBuilderRef Builder, LLVMValueRef Fn, LLVMValueRef RA) {
@@ -83,13 +124,17 @@ LLVMValueRef getClosureFunction(LLVMBuilderRef Builder, LLVMValueRef Closure) {
 }
 
 LLVMValueRef callClosure(LLVMTypeRef FunctionType, LLVMValueRef Closure, LLVMValueRef *Params, unsigned Count) {
-  LLVMValueRef DataRef = getClosureData(Builder, Closure);
-  LLVMValueRef FnPtr   = getClosureFunction(Builder, Closure);
+  LLVMValueRef CopyFunction = LLVMGetNamedFunction(Module, "copy.closure");
+  LLVMValueRef CopyClos     = LLVMBuildCall(Builder, CopyFunction, &Closure, 1, "copy");
 
+  LLVMValueRef DataPtr = getClosureData(Builder, CopyClos);
+  LLVMValueRef DataRef = LLVMBuildLoad(Builder, DataPtr, "");
+
+  LLVMValueRef FnPtr    = getClosureFunction(Builder, CopyClos);
   LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
   LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "CFunction");
 
-  heapPush(LLVMBuildLoad(Builder, DataRef, ""));
+  heapPush(DataRef);
   LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, Params, Count, "");
   heapPop();
 
