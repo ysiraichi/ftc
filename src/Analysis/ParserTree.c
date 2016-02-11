@@ -10,6 +10,7 @@ ASTNode *createASTNode(NodeKind K, void *Value, int N, ...) {
   ASTNode *Node = (ASTNode*) malloc(sizeof(ASTNode));
   Node->Value = Value;
   Node->Kind  = K;
+  Node->EscapedLevel = 0;
 
   initPtrVector(&(Node->Child), 0);
 

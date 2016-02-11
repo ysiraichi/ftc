@@ -27,6 +27,7 @@ struct ASTNode {
   NodeKind Kind;
   void *Value;
   unsigned Pos[2];
+  int EscapedLevel;
   PtrVector Child;
 };
 

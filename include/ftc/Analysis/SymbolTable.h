@@ -19,9 +19,8 @@ void toEscapedName(char*, const char*);
 void initSymTable(ASTNode*, SymbolTable*);
 SymbolTable *createSymbolTable(ASTNode*, SymbolTable*);
 
-void insertIfEscaped(SymbolTable*, char*);
+void insertIfEscaped(SymbolTable*, ASTNode*);
 Hash *getEscapedVars(SymbolTable*, const char*);
-void insertIfEscaped(SymbolTable*, char*);
 int  findEscapedOffset(SymbolTable*, char*, int);
 
 SymbolTable *symTableFindChild(SymbolTable*, ASTNode*);

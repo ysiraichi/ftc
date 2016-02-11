@@ -108,8 +108,8 @@ Hash *getEscapedVars(SymbolTable *St, const char *FName) {
   return symTableFind(St, Buf);
 }
 
-void insertIfEscaped(SymbolTable *St, char *Key) {
-  char Buf[NAME_MAX];
+void insertIfEscaped(SymbolTable *St, ASTNode *Node) {
+  char Buf[NAME_MAX], *Key = Node->Value;
   int Exists;
   Hash *EscapedVars;
   SymbolTable *Ptr = St;
@@ -118,29 +118,36 @@ void insertIfEscaped(SymbolTable *St, char *Key) {
     else Ptr = Ptr->Parent; 
   if (hashExists(&(Ptr->Table), Key)) return;   // has not escaped.
 
-  Type *KeyType = symTableFind(St, Key);
-  KeyType->EscapedLevel = 0;
+  Node->EscapedLevel = 0;
   Exists = 0;
   do {
     Exists |= hashExists(&(Ptr->Table), Key);
-    if (ownerIsFunction(Ptr) && !Exists) KeyType->EscapedLevel++;
+    if (ownerIsFunction(Ptr) && !Exists) Node->EscapedLevel++;
     if (!ownerIsFunction(Ptr) || !Exists) Ptr = Ptr->Parent;
     else break;
   } while (1);
 
+  Type *KeyType = symTableFind(St, Key);
+  KeyType->EscapedLevel = 1;
+
   toEscapedName(Buf, Ptr->Owner->Value);
   EscapedVars = (Hash*) symTableFind(Ptr, Buf);
-  hashInsert(EscapedVars, Key, KeyType);
+  hashInsert(EscapedVars, Key, NULL);
+  printf("SymbolTable: Key '%s' escaped with level %d, inserted at %p(%s).\n", Key, Node->EscapedLevel, (void*)EscapedVars, Buf);
+
 }
 
 int findEscapedOffset(SymbolTable *St, char *Key, int EscapedLevel) {
-  if (!EscapedLevel) return -1;
   SymbolTable *Ptr = St;
-  while (1) {
-    if (ownerIsFunction(Ptr)) EscapedLevel--;
-    if (EscapedLevel) Ptr = Ptr->Parent;
-    else break;
-  }
+  printf("SymbolTable: Begin search for '%s' with escaped level %d.\n", Key, EscapedLevel);
+
+    while (1) {
+      int NewEscapedLevel = EscapedLevel;
+      if (ownerIsFunction(Ptr) && EscapedLevel) NewEscapedLevel--;
+      if (!ownerIsFunction(Ptr) || EscapedLevel) Ptr = Ptr->Parent;
+      else break;
+      EscapedLevel = NewEscapedLevel;
+    }
 
   unsigned Count = 0;
   char Buf[NAME_MAX];
@@ -148,9 +155,11 @@ int findEscapedOffset(SymbolTable *St, char *Key, int EscapedLevel) {
   Hash *EscapedVars = (Hash*) symTableFind(Ptr, Buf);
   for (Count = 0; Count < EscapedVars->Pairs.Size; ++Count) {
     Pair *P = (Pair*) ptrVectorGet(&(EscapedVars->Pairs), Count);
+    printf("SymbolTable: Search found '%s'.\n", (char*)P->first);
     if (!strcmp(P->first, Key)) break;
   }
 
+  printf("SymbolTable: End search for '%s' - Count:(%u) - Size:%lu at %p(%s).\n", Key, Count, EscapedVars->Pairs.Size, (void*)EscapedVars, Buf);
   if (Count < EscapedVars->Pairs.Size) return Count;
   return -1;
 }
