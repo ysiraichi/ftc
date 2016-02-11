@@ -13,6 +13,9 @@ void returnRAHead();
 
 LLVMValueRef createActivationRecord(LLVMBuilderRef, SymbolTable*, const char*);
 LLVMValueRef createCompleteActivationRecord(LLVMBuilderRef, Hash*);
+LLVMValueRef createActivationRecordWithSl(LLVMBuilderRef, const char*);
 LLVMValueRef createDummyActivationRecord(LLVMBuilderRef);
+
+void createDataLink(LLVMBuilderRef, LLVMValueRef, SymbolTable*, const char*);
 
 #endif
