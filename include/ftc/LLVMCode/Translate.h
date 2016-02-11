@@ -20,13 +20,14 @@ LLVMValueRef translateExpr(SymbolTable*, SymbolTable*, ASTNode*);
 void         translateDecl(SymbolTable*, SymbolTable*, ASTNode*);
 
 LLVMValueRef toDynamicMemory(LLVMValueRef);
-LLVMValueRef getEscapedVar(SymbolTable*, Type*, ASTNode*); 
+LLVMValueRef getEscapedVar(SymbolTable*, char*, int); 
 LLVMValueRef getSConstInt(unsigned long long);
 LLVMValueRef getAliasFunction(SymbolTable*, char*, void (*)(char*,const char*));
 LLVMValueRef wrapValue(LLVMValueRef);
 LLVMValueRef unWrapValue(LLVMValueRef);
 LLVMValueRef getFunctionFromBuilder(LLVMBuilderRef);
 
+char *getAliasName(SymbolTable*, const char*, void (*)(char*,const char*));
 char *pickInsertAlias(SymbolTable*, const char*, void (*)(char*,const char*), int (*)(SymbolTable*,const char*));
 void *resolveAliasId(SymbolTable*, char*, void (*)(char*,const char*), void* (*)(SymbolTable*,const char*));
 void copyMemory(LLVMValueRef, LLVMValueRef, LLVMValueRef);

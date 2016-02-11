@@ -37,6 +37,12 @@ LLVMValueRef getFunctionFromBuilder(LLVMBuilderRef Builder) {
 }
 
 /* SymbolTable related stuff. */
+char *getAliasName(SymbolTable *Table, const char *NodeId, void (*toName)(char*,const char*)) {
+  char Buf[NAME_MAX];
+  (*toName)(Buf, NodeId);
+  return (char*) symTableFind(Table, Buf);
+}
+
 LLVMValueRef getAliasFunction(SymbolTable *Table, char *NodeId, void (*toName)(char*,const char*)) {
   char Buf[NAME_MAX], *Name;
   (*toName)(Buf, NodeId);
@@ -72,13 +78,14 @@ char *pickInsertAlias(SymbolTable *Table, const char *NodeId, void (*toBaseName)
   return Name;
 }
 
-LLVMValueRef getEscapedVar(SymbolTable *ValTable, Type *VarType, ASTNode *Node) {
-  int I, Offset = findEscapedOffset(ValTable, Node->Value, VarType->EscapedLevel);
+LLVMValueRef getEscapedVar(SymbolTable *ValTable, char *Var, int EscapedLevel) {
+  printf("Translate: Search for '%s' with escaped level: %d.\n", Var, EscapedLevel);
+  int I, Offset = findEscapedOffset(ValTable, Var, EscapedLevel);
   LLVMValueRef RA        = getHeadRA();
   LLVMValueRef RAContent = LLVMBuildLoad(Builder, RA, "");
 
   LLVMValueRef StaticLinkIdx[] = { getSConstInt(0), getSConstInt(1) };
-  for (I = 1; I < VarType->EscapedLevel; ++I) {
+  for (I = 0; I < EscapedLevel; ++I) {
     RA        = LLVMBuildInBoundsGEP(Builder, RAContent, StaticLinkIdx, 2, "");
     RAContent = LLVMBuildLoad(Builder, RA, "");
   }
@@ -89,6 +96,7 @@ LLVMValueRef getEscapedVar(SymbolTable *ValTable, Type *VarType, ASTNode *Node) 
 
   LLVMValueRef VarOffsetIdx[] = { getSConstInt(Offset) };
   LLVMValueRef EscapedVar     = LLVMBuildInBoundsGEP(Builder, EscapedVars, VarOffsetIdx, 1, "");
+  printf("EscapedGEP: %s\n", LLVMPrintValueToString(EscapedVar));
   /*
    * Return a <type>**
    */
@@ -98,6 +106,8 @@ LLVMValueRef getEscapedVar(SymbolTable *ValTable, Type *VarType, ASTNode *Node) 
 /* Memory functions. */
 LLVMValueRef toDynamicMemory(LLVMValueRef Val) {
   LLVMTypeRef  ValueType = LLVMGetElementType(LLVMTypeOf(Val));
+
+  if (LLVMGetTypeKind(ValueType) == LLVMStructTypeKind) return Val;
 
   LLVMValueRef DynMemPtr = LLVMBuildMalloc(Builder, ValueType, "");
 

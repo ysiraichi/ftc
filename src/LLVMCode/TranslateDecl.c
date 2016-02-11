@@ -23,8 +23,8 @@ static void translateVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNod
   symTableInsertLocal(ValTable, Name, ExprVal);
 
   if (VarType->EscapedLevel > 0) {
-    LLVMValueRef EscV = getEscapedVar(ValTable, VarType, Node);
-    LLVMValueRef EscVarCast = LLVMBuildBitCast(Builder, EscV, VarTyRef, "");
+    LLVMValueRef EscV = getEscapedVar(ValTable, Node->Value, Node->EscapedLevel);
+    LLVMValueRef EscVarCast = LLVMBuildBitCast(Builder, EscV, LLVMPointerType(LLVMTypeOf(ExprVal), 0), "");
     LLVMBuildStore(Builder, toDynamicMemory(ExprVal), EscVarCast);
   }
 }
@@ -91,6 +91,7 @@ static void translateTyDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode
 
 static LLVMTypeRef *getLLVMTypesFromSeqTy(SymbolTable *St, Type *ParamType, int *Count) {
   LLVMTypeRef *SeqTyRef = NULL;
+  if (!ParamType) return NULL;
   if (ParamType->Kind == SeqTy) {
     *Count = 0;
     PtrVector *V = (PtrVector*) ParamType->Val;
@@ -117,8 +118,6 @@ static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AS
   for (; I != E; ++I) {
     ASTNode *FnDeclNode = (ASTNode*) *I;
 
-    SymbolTable *ValTable_ = symTableFindChild(ValTable, FnDeclNode);
-
     Type *FunType   = (Type*) symTableFind(ValTable, FnDeclNode->Value),
          **ArrTy    = (Type**) FunType->Val;
 
@@ -131,31 +130,9 @@ static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AS
     // Creating alias for the function
     char *Name   = pickInsertAlias(ValTable, FnDeclNode->Value, &toValName, &symTableExistsGlobal);
 
-    // Saving the last BasicBlock.
-    LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
+    // Creating function
+    LLVMAddFunction(Module, Name, FunTypeRef);
 
-    // Creating new function, and its entry BasicBlock.
-    LLVMValueRef   Function = LLVMAddFunction(Module, Name, FunTypeRef);
-    LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
-    LLVMPositionBuilderAtEnd(Builder, Entry);
-
-    // Activation record and closure created.
-    LLVMValueRef ThisRA = createActivationRecord(Builder, ValTable_, FnDeclNode->Value);
-    LLVMValueRef ThisClosure = createClosure(Builder, Function, ThisRA);
-
-    // Inserting the function name alias in the hash.
-    printf("Translate: Inserted function '%s' into %p.\n", Name, (void*)ValTable);
-    symTableInsertLocal(ValTable, Name, ThisClosure);
-
-    if (FunType->EscapedLevel > 0) {
-      LLVMValueRef EscClosure  = toDynamicMemory(ThisClosure);
-      LLVMValueRef EscVariable = getEscapedVar(ValTable_, FunType, FnDeclNode);
-      LLVMValueRef EscClosCast = LLVMBuildBitCast(Builder, EscClosure, LLVMPointerType(LLVMInt8Type(), 0), "");
-      LLVMBuildStore(Builder, EscClosCast, EscVariable);
-    }   
-
-    // Restoring the BasicBlock saved.
-    if (OldBB) LLVMPositionBuilderAtEnd(Builder, OldBB);
   }
   I = beginPtrVector(&(Node->Child));
   E = endPtrVector(&(Node->Child));
@@ -166,6 +143,7 @@ static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AS
 
 static void translateArgs(SymbolTable *ValTable, ASTNode *Node, LLVMValueRef Function) {
   printf("Args\n");
+  if (!Node) return;
 
   unsigned I;
   PtrVector *V = &(Node->Child);
@@ -181,9 +159,12 @@ static void translateArgs(SymbolTable *ValTable, ASTNode *Node, LLVMValueRef Fun
     symTableInsertLocal(ValTable, Name, wrapValue(Param));
 
     if (ArgType->EscapedLevel > 0) {
-      LLVMValueRef EscV       = getEscapedVar(ValTable, ArgType, ArgNode);
-      LLVMValueRef EscVarCast = LLVMBuildBitCast(Builder, EscV, LLVMPointerType(ParamType, 0), "");
-      LLVMBuildStore(Builder, toDynamicMemory(Param), EscVarCast);
+      printf("Translate: Updating '%s' with 'hasEscaped':%d.\n", (char*)ArgNode->Value, ArgType->EscapedLevel);
+      LLVMValueRef Wrapped    = wrapValue(Param);
+      LLVMTypeRef  WrappedTy  = LLVMTypeOf(Wrapped);
+      LLVMValueRef EscV       = getEscapedVar(ValTable, ArgNode->Value, ArgNode->EscapedLevel);
+      LLVMValueRef EscVarCast = LLVMBuildBitCast(Builder, EscV, LLVMPointerType(WrappedTy, 0), "");
+      LLVMBuildStore(Builder, toDynamicMemory(Wrapped), EscVarCast);
     }
   }
 }
@@ -196,43 +177,55 @@ static void translateFunDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNod
   Type    *FunType = (Type*) symTableFind(ValTable, Node->Value),
           **ArrTy  = (Type**) FunType->Val;
 
-  // Saving the last BasicBlock.
-  LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
-
   // Getting function LLVMValueRef
   LLVMValueRef Function = getAliasFunction(ValTable, Node->Value, &toValName);
 
-  // Creating new BasicBlock
-  LLVMBasicBlockRef Entry = LLVMGetEntryBasicBlock(Function);
+  // Activation record and closure created.
+  putRAHeadAhead(LLVMBuildLoad(Builder, getHeadRA(), "ld.heap.ra"));
+  LLVMValueRef ThisClosure = createClosure(Builder, Function, createActivationRecordWithSl(Builder, Node->Value));
+  returnRAHead();
+
+  // Inserting the function name alias in the hash.
+  char *Name = getAliasName(ValTable, Node->Value, &toValName);
+  symTableInsertLocal(ValTable, Name, ThisClosure);
+  printf("Translate: Inserted function '%s' into %p.\n", Name, (void*)ValTable);
+
+  if (FunType->EscapedLevel > 0) {
+    LLVMValueRef EscVariable = getEscapedVar(ValTable, Node->Value, Node->EscapedLevel);
+    LLVMValueRef EscClosCast = LLVMBuildBitCast(Builder, ThisClosure, LLVMPointerType(LLVMInt8Type(), 0), "");
+    LLVMBuildStore(Builder, EscClosCast, EscVariable);
+  }
+
+  // Saving the last BasicBlock.
+  LLVMBasicBlockRef OldBB = LLVMGetInsertBlock(Builder);
+
+  /* =--------------------------------------- Inside new function ------------------------------------------- */
+
+  // Creating entry BasicBlock.
+  LLVMBasicBlockRef Entry = LLVMAppendBasicBlock(Function, "entry");
   LLVMPositionBuilderAtEnd(Builder, Entry);
 
-  // Getting function closure.
-  LLVMValueRef Closure = (LLVMValueRef) resolveAliasId(ValTable, Node->Value, &toValName, &symTableFind);
+  // Creating activation record.
+  LLVMValueRef ThisRA = LLVMBuildLoad(Builder, getHeadRA(), "ld.heap.ra");
+  createDataLink(Builder, ThisRA, ValTable_, Node->Value);
 
-  // Putting RAHead forward
-  LLVMValueRef RAIdx[] = { getSConstInt(0), getSConstInt(0) };
-  LLVMValueRef ClosRA  = LLVMBuildInBoundsGEP(Builder, Closure, RAIdx, 2, "");
-  LLVMValueRef RALoad  = LLVMBuildLoad(Builder, ClosRA, "top.ra");
-  putRAHeadAhead(RALoad);
-  
   // Getting function type.
   int Size = 0;
   LLVMTypeRef *ParamTypeRef = getLLVMTypesFromSeqTy(TyTable, ArrTy[0], &Size),
               ReturnTypeRef = toTransitionType(getLLVMTypeFromType(TyTable, ArrTy[1])),
               FunTypeRef = LLVMFunctionType(ReturnTypeRef, ParamTypeRef, Size, 0);
   FunTypeRef = LLVMPointerType(FunTypeRef, 0);
-  
+
   translateArgs(ValTable_, ptrVectorGet(&(Node->Child), 0), Function);
 
-  // Restoring RAHead
-  returnRAHead();
-
   LLVMValueRef ReturnVal = translateExpr(TyTable_, ValTable_, Expr);
+
   if (ArrTy[1]->Kind == AnswerTy) LLVMBuildRetVoid(Builder);
   else {
     ReturnVal = unWrapValue(ReturnVal);
     LLVMBuildRet(Builder, ReturnVal);
   }
+  /* =------------------------------------------------------------------------------------------------------- */
 
   // Restoring the BasicBlock saved.
   if (OldBB) LLVMPositionBuilderAtEnd(Builder, OldBB);

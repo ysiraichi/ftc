@@ -44,7 +44,7 @@ translateIdLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
 
   if (IdType->EscapedLevel > 0) {
     LLVMTypeRef LLVMType = getLLVMTypeFromType(TyTable, IdType);
-    LLVMValueRef EVPtr   = getEscapedVar(ValTable, IdType, Node);
+    LLVMValueRef EVPtr   = getEscapedVar(ValTable, Node->Value, Node->EscapedLevel);
     LLVMValueRef EVLoad  = LLVMBuildLoad(Builder, EVPtr, "");
 
     IdValue = LLVMBuildBitCast(Builder, EVLoad, LLVMPointerType(LLVMType, 0), "");
@@ -168,7 +168,7 @@ static LLVMValueRef
 translateBinOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   printf("BinOp\n");
   ASTNode *NodeE1 = (ASTNode*) ptrVectorGet(&(Node->Child), 0),
-          *NodeE2 = (ASTNode*) ptrVectorGet(&(Node->Child), 0);
+          *NodeE2 = (ASTNode*) ptrVectorGet(&(Node->Child), 1);
 
   LLVMValueRef ValueE1Ptr = translateExpr(TyTable, ValTable, NodeE1),
                ValueE2Ptr = translateExpr(TyTable, ValTable, NodeE2);
@@ -185,6 +185,11 @@ translateBinOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     case LLVMPointerTypeKind: ResultVal = translateStringBinOp(Node->Kind, StrCmpFn, ValueE1, ValueE2); break;
 
     default: return NULL;
+  }
+
+  switch (LLVMGetTypeKind(LLVMTypeOf(ResultVal))) {
+    case LLVMIntegerTypeKind: ResultVal = LLVMBuildZExt(Builder, ResultVal, LLVMInt32Type(), ""); break;
+    default: break;
   }
   return wrapValue(ResultVal);
 }
@@ -232,7 +237,9 @@ translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
 
   // Creating the conditional branch.
   LLVMValueRef CondValue = translateExpr(TyTable, ValTable, CondNode);
-  LLVMBuildCondBr(Builder, LLVMBuildLoad(Builder, CondValue, ""), TrueBB, FalseBB);
+  LLVMValueRef CondLoad  = LLVMBuildLoad(Builder, CondValue, "");
+  LLVMValueRef CalcTrueFalse = LLVMBuildICmp(Builder, LLVMIntNE, CondLoad, getSConstInt(0), "");
+  LLVMBuildCondBr(Builder, CalcTrueFalse, TrueBB, FalseBB);
 
   // Filling the BasicBlocks.
   LLVMValueRef TrueValue, FalseValue;
@@ -248,7 +255,7 @@ translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
   }
 
   LLVMPositionBuilderAtEnd(Builder, EndBB);
-  if (ElseNode) {
+  if (ElseNode && LLVMGetTypeKind(LLVMTypeOf(TrueValue)) != LLVMVoidTypeKind) {
     LLVMValueRef PhiNode = LLVMBuildPhi(Builder, LLVMTypeOf(TrueValue), "");
     // Adding incoming to phi-node.
     LLVMValueRef      Values[] = { TrueValue, FalseValue };
@@ -269,42 +276,36 @@ translateFunCallExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node)
 
   LLVMTypeRef ReturnType  = toTransitionType(getLLVMTypeFromType(TyTable, Node->Value)),
               *ParamsType = NULL, FunctionType;
+  LLVMValueRef *ParamsValue = NULL;
 
-  unsigned Count;
-  LLVMValueRef ParamsVal[ParamsNode->Child.Size];
-  for (Count = 0; Count < ParamsNode->Child.Size; ++Count) {
-    LLVMValueRef ExprVal = translateExpr(TyTable, ValTable, ptrVectorGet(&(ParamsNode->Child), Count));
+  unsigned Count = 0;
+  if (ParamsNode) {
+    ParamsValue = (LLVMValueRef*) malloc(sizeof(LLVMValueRef) * ParamsNode->Child.Size);
+    for (Count = 0; Count < ParamsNode->Child.Size; ++Count) {
+      LLVMValueRef ExprVal = translateExpr(TyTable, ValTable, ptrVectorGet(&(ParamsNode->Child), Count));
 
-    LLVMTypeRef ExprType = LLVMGetElementType(LLVMTypeOf(ExprVal));
-    switch (LLVMGetTypeKind(ExprType)) {
-      case LLVMIntegerTypeKind:
-      case LLVMFloatTypeKind:
-      case LLVMPointerTypeKind: ExprVal = LLVMBuildLoad(Builder, ExprVal, "load.4.call"); break;
+      LLVMTypeRef ExprType = LLVMGetElementType(LLVMTypeOf(ExprVal));
+      switch (LLVMGetTypeKind(ExprType)) {
+        case LLVMIntegerTypeKind:
+        case LLVMFloatTypeKind:
+        case LLVMPointerTypeKind: ExprVal = LLVMBuildLoad(Builder, ExprVal, "load.4.call"); break;
 
-      default: break;
+        default: break;
+      }
+
+      ParamsValue[Count]  = ExprVal;
+
+      if (!ParamsType) 
+        ParamsType = (LLVMTypeRef*) malloc(sizeof(LLVMTypeRef) * ParamsNode->Child.Size);
+      ParamsType[Count] = LLVMTypeOf(ExprVal);
     }
-
-    ParamsVal[Count]  = ExprVal;
-
-    if (!ParamsType) 
-      ParamsType = (LLVMTypeRef*) malloc(sizeof(LLVMTypeRef) * ParamsNode->Child.Size);
-    ParamsType[Count] = LLVMTypeOf(ExprVal);
   }
 
   FunctionType = LLVMFunctionType(ReturnType, ParamsType, Count, 0);
   FunctionType = LLVMPointerType(FunctionType, 0);
 
-  LLVMValueRef Closure = translateExpr(TyTable, ValTable, ExprNode);
-
-  LLVMValueRef DataRef = getClosureData(Builder, Closure);
-  LLVMValueRef FnPtr   = getClosureFunction(Builder, Closure);
-
-  LLVMValueRef FnLoad   = LLVMBuildLoad(Builder, FnPtr, "");
-  LLVMValueRef Function = LLVMBuildBitCast(Builder, FnLoad, FunctionType, "");
-
-  heapPush(LLVMBuildLoad(Builder, DataRef, ""));
-  LLVMValueRef CallValue = LLVMBuildCall(Builder, Function, ParamsVal, Count, "");
-  heapPop();
+  LLVMValueRef Closure   = translateExpr(TyTable, ValTable, ExprNode);
+  LLVMValueRef CallValue = callClosure(FunctionType, Closure, ParamsValue, Count);
 
   switch (getLLVMValueTypeKind(CallValue)) {
     case LLVMIntegerTypeKind:
