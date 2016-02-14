@@ -67,9 +67,9 @@ translateRecAccessLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Nod
     RecTypeRef = LLVMGetElementType(RecTypeRef);
 
   /* Get struct's name. */
-  const char *Buf = LLVMGetStructName(RecTypeRef); 
+  const char *AliasName = LLVMGetStructName(RecTypeRef); 
   char TypeName[NAME_MAX];
-  strcpy(TypeName, Buf);
+  toRawName(TypeName, AliasName);
 
   /* Get struct's field. */
   Type      *RecType = (Type*) symTableFind(TyTable, TypeName);
@@ -84,7 +84,13 @@ translateRecAccessLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Nod
   }
 
   LLVMValueRef Idx[] = { getSConstInt(0), getSConstInt(Count) };
-  return LLVMBuildInBoundsGEP(Builder, Record, Idx, 2, "");
+  LLVMValueRef Field = LLVMBuildInBoundsGEP(Builder, Record, Idx, 2, "");
+
+  LLVMTypeRef FieldElType = LLVMGetElementType(LLVMTypeOf(Field));
+  if (LLVMGetTypeKind(FieldElType) == LLVMPointerTypeKind &&
+      LLVMGetTypeKind(LLVMGetElementType(FieldElType)) == LLVMStructTypeKind)
+    Field = LLVMBuildLoad(Builder, Field, "get.struct");
+  return Field;
 }
 
 static LLVMValueRef 
@@ -138,8 +144,9 @@ translateFloatBinOp(NodeKind Op, LLVMValueRef ValueE1, LLVMValueRef ValueE2) {
 }
 
 static LLVMValueRef
-translateStringBinOp(NodeKind Op, LLVMValueRef StrCmpFn, LLVMValueRef ValueE1, LLVMValueRef ValueE2) {
+translateStringBinOp(NodeKind Op, LLVMValueRef ValueE1, LLVMValueRef ValueE2) {
   printf("StringBinOp\n");
+  LLVMValueRef StrCmpFn   = LLVMGetNamedFunction(Module, "strcmp");
   LLVMValueRef CmpArgs[]  = { ValueE1, ValueE2 },
                CallStrCmp = LLVMBuildCall(Builder, StrCmpFn, CmpArgs, 2, ""),
                ZeroConst  = LLVMConstInt(LLVMInt32Type(), 0, 1);
@@ -176,13 +183,12 @@ translateBinOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   LLVMValueRef ValueE1 = LLVMBuildLoad(Builder, ValueE1Ptr, "binop.ld.e1."),
                ValueE2 = LLVMBuildLoad(Builder, ValueE2Ptr, "binop.ld.e2.");
 
-  LLVMValueRef StrCmpFn  = symTableFindGlobal(ValTable, "strcmp");
   LLVMValueRef ResultVal = NULL;
   switch (LLVMGetTypeKind(LLVMTypeOf(ValueE1))) {
     case LLVMIntegerTypeKind: ResultVal = translateIntBinOp   (Node->Kind, ValueE1, ValueE2); break;
     case LLVMFloatTypeKind:   ResultVal = translateFloatBinOp (Node->Kind, ValueE1, ValueE2); break;
-    case LLVMStructTypeKind:  ResultVal = translateStructBinOp(Node->Kind, ValueE1, ValueE2); break;
-    case LLVMPointerTypeKind: ResultVal = translateStringBinOp(Node->Kind, StrCmpFn, ValueE1, ValueE2); break;
+    case LLVMStructTypeKind:  ResultVal = translateStructBinOp(Node->Kind, ValueE1Ptr, ValueE2Ptr); break;
+    case LLVMPointerTypeKind: ResultVal = translateStringBinOp(Node->Kind, ValueE1, ValueE2); break;
 
     default: return NULL;
   }
@@ -254,6 +260,7 @@ translateIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
     LLVMBuildBr(Builder, EndBB);
   }
 
+  FalseBB = LLVMGetInsertBlock(Builder);
   LLVMPositionBuilderAtEnd(Builder, EndBB);
   if (ElseNode && LLVMGetTypeKind(LLVMTypeOf(TrueValue)) != LLVMVoidTypeKind) {
     LLVMValueRef PhiNode = LLVMBuildPhi(Builder, LLVMTypeOf(TrueValue), "");
@@ -330,7 +337,7 @@ translateArrayExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
 
   ASTNode *SizeNode = (ASTNode*) ptrVectorGet(V, 0),
           *InitNode = (ASTNode*) ptrVectorGet(V, 1);
-  Type    *ThisType = (Type*) symTableFind(TyTable, Node->Value);
+  Type    *ThisType  = createType(IdTy, Node->Value);
 
   LLVMTypeRef ArrayType = getLLVMTypeFromType(TyTable, ThisType);
 
@@ -380,7 +387,7 @@ translateRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
   PtrVector *V = &(Node->Child);
 
   ASTNode *FieldNode = (ASTNode*) ptrVectorGet(V, 0);
-  Type    *ThisType  = (Type*) symTableFind(TyTable, Node->Value);
+  Type    *ThisType  = createType(IdTy, Node->Value);
 
   LLVMTypeRef RecordType = getLLVMTypeFromType(TyTable, ThisType);
 
@@ -388,25 +395,34 @@ translateRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) 
   unsigned FieldNumber   = LLVMCountStructElementTypes(RecordType),
            I;
   for (I = 0; I < FieldNumber; ++I) {
-    LLVMTargetDataRef DataRef = LLVMCreateTargetData(LLVMGetDataLayout(Module));
-    unsigned long long Size = LLVMStoreSizeOfType(DataRef, LLVMStructGetTypeAtIndex(RecordType, I));
-
     LLVMValueRef ElemIdx[] = { getSConstInt(0), getSConstInt(I) };
     LLVMValueRef ElemI     = LLVMBuildInBoundsGEP(Builder, RecordVal, ElemIdx, 2, "");
     LLVMValueRef FieldPtr  = translateExpr(TyTable, ValTable, ptrVectorGet(&(FieldNode->Child), I));
-    LLVMValueRef FieldLoad = LLVMBuildLoad(Builder, FieldPtr, "");
-    copyMemory(ElemI, FieldLoad, getSConstInt(Size));
+
+    LLVMValueRef ValueFrom = NULL;
+    switch (LLVMGetTypeKind(LLVMGetElementType(LLVMTypeOf(FieldPtr)))) {
+      case LLVMIntegerTypeKind:
+      case LLVMFloatTypeKind:   ValueFrom = LLVMBuildLoad(Builder, FieldPtr, ""); break;
+      case LLVMPointerTypeKind: ValueFrom = toDynamicMemory(FieldPtr); break;
+      default: ValueFrom = FieldPtr;
+    }
+    LLVMBuildStore(Builder, ValueFrom, ElemI);
   }
   return RecordVal; 
+}
+
+static LLVMValueRef
+translateFieldExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
+  return translateExpr(TyTable, ValTable, ptrVectorGet(&(Node->Child), 0));
 }
 
 static LLVMValueRef
 translateNilExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   printf("NilExpr\n");
   if (!Node->Value) exit(1);
-  Type       *RecordType = getRealType(TyTable, symTableFind(TyTable, Node->Value));
-  LLVMTypeRef Record     = LLVMGetTypeByName(Module, RecordType->Val);
-  return LLVMConstPointerNull(Record);
+  Type   *RecordType = createType(IdTy, ((Type*)Node->Value)->Val);
+  LLVMTypeRef Record = getLLVMTypeFromType(TyTable, RecordType);
+  return LLVMConstPointerNull(LLVMPointerType(Record, 0));
 }
 
 LLVMValueRef translateExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
@@ -440,6 +456,7 @@ LLVMValueRef translateExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode 
     case FunCallExpr: return translateFunCallExpr(TyTable, ValTable, Node);
     case ArrayExpr:   return translateArrayExpr  (TyTable, ValTable, Node); 
     case RecordExpr:  return translateRecordExpr (TyTable, ValTable, Node);
+    case FieldExpr:   return translateFieldExpr  (TyTable, ValTable, Node);
 
     case NilExpr: return translateNilExpr(TyTable, ValTable, Node);
 

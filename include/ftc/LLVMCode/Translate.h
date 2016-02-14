@@ -14,6 +14,7 @@
 void toValName     (char*, const char*);
 void toStructName  (char*, const char*);
 void toFunctionName(char*, const char*);
+void toRawName     (char*, const char*);
 
 
 LLVMValueRef translateExpr(SymbolTable*, SymbolTable*, ASTNode*);
@@ -35,6 +36,7 @@ void copyMemory(LLVMValueRef, LLVMValueRef, LLVMValueRef);
 int  getLLVMValueTypeKind(LLVMValueRef);
 int  getLLVMElementTypeKind(LLVMValueRef);
 
+LLVMTypeRef wrapStructElementType(LLVMTypeRef);
 LLVMTypeRef getLLVMTypeFromType(SymbolTable*, Type*);
 LLVMTypeRef toTransitionType(LLVMTypeRef);
 

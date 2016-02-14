@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 /* <function> */
-static Type *simplifyType(Type *Ty) {
+Type *simplifyType(Type *Ty) {
   if (!Ty) return NULL;
   if (Ty->Kind != SeqTy) return Ty;
 
@@ -132,7 +132,16 @@ void destroyType(void *T) {
 }
 
 /* <function> */
+void checkIfNilTy(Type *T1, Type *T2) {
+  if (!T1 || !T2) return;
+  if (T1->Kind != NilTy && T2->Kind != NilTy) return;
+  if (T1->Kind == NilTy && T2->Kind == IdTy) T1->Val = T2->Val;
+  if (T2->Kind == NilTy && T1->Kind == IdTy) T2->Val = T1->Val;
+}
+
+/* <function> */
 int compareType(Type *One, Type *Two) {
+  checkIfNilTy(One, Two);
   One = simplifyType(One);
   Two = simplifyType(Two);
 
@@ -162,7 +171,7 @@ int compareType(Type *One, Type *Two) {
     case ArrayTy:
       return compareType(One->Val, Two->Val);
     case RecordTy:
-      return (One == Two) || (Two->Kind == NilTy);
+      return (One->Val == Two->Val) || (Two->Kind == NilTy);
     case FunTy:
       {
         Type **TyArr1 = (Type**) One->Val,

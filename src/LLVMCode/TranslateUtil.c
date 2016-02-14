@@ -19,6 +19,19 @@ void toStructName(char *Dst, const char *TypeName) {
   sprintf(Dst, "struct.%s", TypeName);
 }
 
+void toRawName(char *Dst, const char *TypeName) {
+  int Count = 0;
+  const char *Ptr = TypeName;
+
+  while (*Ptr != '.') ++Ptr;
+  ++Ptr;
+  while (*Ptr != '.') {
+    Dst[Count++] = *Ptr;
+    ++Ptr;
+  }
+  Dst[Count] = '\0';
+}
+
 /* LLVM library stuff. */
 LLVMValueRef getSConstInt(unsigned long long N) {
   return LLVMConstInt(LLVMInt32Type(), N, 1);
@@ -96,7 +109,7 @@ LLVMValueRef getEscapedVar(SymbolTable *ValTable, char *Var, int EscapedLevel) {
 
   LLVMValueRef VarOffsetIdx[] = { getSConstInt(Offset) };
   LLVMValueRef EscapedVar     = LLVMBuildInBoundsGEP(Builder, EscapedVars, VarOffsetIdx, 1, "");
-  printf("EscapedGEP: %s\n", LLVMPrintValueToString(EscapedVar));
+  //printf("EscapedGEP: %s\n", LLVMPrintValueToString(EscapedVar));
   /*
    * Return a <type>**
    */
@@ -104,21 +117,40 @@ LLVMValueRef getEscapedVar(SymbolTable *ValTable, char *Var, int EscapedLevel) {
 }
 
 /* Memory functions. */
+LLVMValueRef newString(LLVMValueRef From) {
+  LLVMValueRef StrLenFn  = LLVMGetNamedFunction(Module, "strlen");
+  LLVMValueRef StrLength = LLVMBuildCall(Builder, StrLenFn, &From, 1, "str.length");
+  LLVMValueRef NewString = LLVMBuildArrayMalloc(Builder, LLVMInt8Type(), StrLength, "new.string");
+  copyMemory(NewString, From, StrLength);
+  return NewString;
+}
+
 LLVMValueRef toDynamicMemory(LLVMValueRef Val) {
+  if (LLVMGetTypeKind(LLVMTypeOf(Val)) != LLVMPointerTypeKind) return Val;
+
   LLVMTypeRef  ValueType = LLVMGetElementType(LLVMTypeOf(Val));
 
   if (LLVMGetTypeKind(ValueType) == LLVMStructTypeKind) return Val;
 
-  LLVMValueRef DynMemPtr = LLVMBuildMalloc(Builder, ValueType, "");
+  LLVMValueRef DynMemPtr = NULL;
+  LLVMValueRef ValLoad = LLVMBuildLoad(Builder, Val, "ld.static.value");
 
-  LLVMTargetDataRef DataRef = LLVMCreateTargetData(LLVMGetDataLayout(Module));
-  unsigned long long Size   = LLVMStoreSizeOfType(DataRef, ValueType);
-
-  copyMemory(DynMemPtr, Val, getSConstInt(Size));
-  if (LLVMGetTypeKind(ValueType) == LLVMPointerTypeKind) {
-    LLVMValueRef PointeeMalloc = toDynamicMemory(LLVMBuildLoad(Builder, Val, ""));
-    LLVMBuildStore(Builder, PointeeMalloc, DynMemPtr);
+  switch (LLVMGetTypeKind(ValueType)) {
+    case LLVMIntegerTypeKind:
+    case LLVMFloatTypeKind:   
+      {
+        DynMemPtr = LLVMBuildMalloc(Builder, ValueType, "");
+        LLVMBuildStore(Builder, ValLoad, DynMemPtr);
+        break;
+      }
+    case LLVMPointerTypeKind:
+      {
+        DynMemPtr = newString(ValLoad);
+        break;
+      }
+    default: return NULL;
   }
+
   return DynMemPtr;
 }
 
@@ -137,6 +169,15 @@ void copyMemory(LLVMValueRef To, LLVMValueRef From, LLVMValueRef Length) {
   };
 
   LLVMBuildCall(Builder, MemCpyFn, Params, 5, "");
+}
+
+LLVMTypeRef wrapStructElementType(LLVMTypeRef Ty) {
+  switch (LLVMGetTypeKind(Ty)) {
+    case LLVMStructTypeKind: return LLVMPointerType(Ty, 0);
+
+    default: break;
+  }
+  return Ty;
 }
 
 LLVMValueRef wrapValue(LLVMValueRef Val) {

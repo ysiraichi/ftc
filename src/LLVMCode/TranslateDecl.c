@@ -12,10 +12,8 @@ static void translateVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNod
   PtrVector *V = &(Node->Child);
 
   ASTNode *ExprNode = (ASTNode*) ptrVectorGet(V, 1);
-  Type    *VarType  = (Type*) symTableFind(ValTable, Node->Value),
-          *RealType = getRealType(TyTable, VarType);
+  Type    *VarType  = (Type*) symTableFind(ValTable, Node->Value);
 
-  LLVMTypeRef  VarTyRef = getLLVMTypeFromType(TyTable, RealType);
   LLVMValueRef ExprVal  = translateExpr(TyTable, ValTable, ExprNode);
 
   char *Name = pickInsertAlias(ValTable, Node->Value, &toValName, &symTableExistsLocal);
@@ -31,11 +29,8 @@ static void translateVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNod
 
 static LLVMTypeRef *getLLVMStructField(SymbolTable *TyTable, ASTNode *Node, int *Size) {
   *Size = 0;
-  Type    *RecordType = getRealType(TyTable, symTableFind(TyTable, Node->Value));
-  if (RecordType->Kind == IdTy) 
-    RecordType = (Type*) symTableFind(TyTable, RecordType->Val);
-
-  if (RecordType->Kind == RecordTy) {
+  Type *RecordType = getRecordType(TyTable, symTableFind(TyTable, Node->Value));
+  if (RecordType) {
     Hash      *H = (Hash*) RecordType->Val;
     PtrVector *V = &(H->Pairs);
 
@@ -45,8 +40,11 @@ static LLVMTypeRef *getLLVMStructField(SymbolTable *TyTable, ASTNode *Node, int 
 
     PtrVectorIterator I = beginPtrVector(V),
                       E = endPtrVector(V);
-    for (; I != E; ++I)
-      Fields[*Size++] = getLLVMTypeFromType(TyTable, *I);
+    for (; I != E; ++I) {
+      Pair *P = (Pair*) *I;
+      Fields[(*Size)++] = 
+        wrapStructElementType(getLLVMTypeFromType(TyTable, P->second));
+    }
     return Fields;
   }
   return NULL;
@@ -59,10 +57,9 @@ static void translateTyDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AST
   E = endPtrVector(&(Node->Child));
   for (; I != E; ++I) {
     ASTNode *TyDeclNode = (ASTNode*) *I;
-    Type    *RecordType = getRealType(TyTable, symTableFind(TyTable, TyDeclNode->Value));
-    if (RecordType->Kind == IdTy) 
-      RecordType = (Type*) symTableFind(TyTable, RecordType->Val);
-    if (RecordType->Kind != RecordTy) continue;
+
+    Type *RecordType = getRecordType(TyTable, symTableFind(TyTable, TyDeclNode->Value));
+    if (!RecordType) continue;
 
     LLVMContextRef Context = LLVMGetModuleContext(Module);
 
@@ -84,7 +81,8 @@ static void translateTyDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode
   int Size;
   LLVMTypeRef *Fields = getLLVMStructField(TyTable, Node, &Size);
   if (Size) {
-    LLVMTypeRef Struct = getLLVMTypeFromType(TyTable, createType(Node->Kind, Node->Value));
+    char *Name = getAliasName(TyTable, Node->Value, &toStructName);
+    LLVMTypeRef Struct = LLVMGetTypeByName(Module, Name);
     LLVMStructSetBody(Struct, Fields, Size, 0);
   }
 }

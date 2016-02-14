@@ -19,10 +19,8 @@ checkRecAccessLval(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   PtrVector *V = &(Node->Child);
 
   Type *ExprType = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)),
-       *Resolved = resolveType(TyTable, ExprType); 
-  if (Resolved->Kind != IdTy) semError(1, Node, "Variable type is not a record.");
+       *RealType = getRealType(TyTable, ExprType); 
 
-  Type *RealType = (Type*) symTableFind(TyTable, Resolved->Val);
   if (RealType->Kind == RecordTy) {
     Hash *RecordScope = (Hash*) RealType->Val;
     if (hashExists(RecordScope, Node->Value)) 
@@ -112,12 +110,17 @@ checkBinOp(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 0)), 
        *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1));
 
+  checkIfNilTy(E1, E2);
+
+  E1 = getRealType(TyTable, E1);
+  E2 = getRealType(TyTable, E2);
+
   if (typeEqual(TyTable, E1, E2)) {
     switch (E1->Kind) {
       case IntTy:    return E1;
       case FloatTy:  return checkFloatBinOp (Node, E1);
       case StringTy: return checkStringBinOp(Node);
-      case IdTy:     return checkStructBinOp(Node);
+      case RecordTy: return checkStructBinOp(Node);
 
       default: semError(1, Node, "Invalid operators type in binary operation.");
     }
@@ -158,6 +161,8 @@ checkIfThenExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
   if (ExprType->Kind == IntTy) {
     Type *E1 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 1)), 
          *E2 = checkExpr(TyTable, ValTable, ptrVectorGet(V, 2));
+    
+    checkIfNilTy(E1, E2);
 
     if (E2 && typeEqual(TyTable, E1, E2)) return E1;
     else if (E2) semError(1, Node, 
@@ -232,8 +237,7 @@ checkRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
 
   PtrVector *V = &(Node->Child);
   PtrVectorIterator B, E;
-  Type *NodeType = resolveType(TyTable, createType(IdTy, Node->Value)),
-       *ThisType = (Type*) symTableFind(TyTable, NodeType->Val);
+  Type *ThisType = getRealType(TyTable, createType(IdTy, Node->Value));
 
   if (!ThisType) semError(1, Node, "Undefined type '%s'.", Node->Value);
 
@@ -246,8 +250,10 @@ checkRecordExpr(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
     if (RecScope->Pairs.Size == Record->Pairs.Size) {
       for (B = beginHash(RecScope), E = endHash(RecScope); B != E; ++B) {
         Pair *P = (Pair*) *B;
+        Type *Ty = (Type*) hashFind(Record, P->first);
+        checkIfNilTy(Ty, P->second);
         Success = Success && hashExists(Record, P->first) && 
-          typeEqual(TyTable, P->second, hashFind(Record, P->first));
+          typeEqual(TyTable, P->second, Ty);
         if (!Success) break;
       }
 

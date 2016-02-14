@@ -3,11 +3,6 @@
 static LLVMTypeRef getLLVMTypeFromId(SymbolTable *TyTable, Type *Ty) {
   Type *Detailed = (Type*) symTableFind(TyTable, Ty->Val);
 
-  if (Detailed->Kind == RecordTy) {
-
-    return resolveAliasId(TyTable, Ty->Val, &toStructName, &symTableFindGlobal);
-  }
-  
   if (Detailed->Kind == ArrayTy) {
 
     return LLVMPointerType(getLLVMTypeFromType(TyTable, Ty->Val), 0);
@@ -24,6 +19,8 @@ LLVMTypeRef getLLVMTypeFromType(SymbolTable *TyTable, Type *Ty) {
     case IntTy:    return LLVMInt32Type();
     case FloatTy:  return LLVMFloatType();
     case StringTy: return LLVMPointerType(LLVMInt8Type(), 0);
+
+    case RecordTy: return resolveAliasId(TyTable, getUnifiedId(TyTable, Ty), &toStructName, &symTableFindGlobal);
 
     case FunTy: return symTableFindGlobal(TyTable, "struct.Closure");
 

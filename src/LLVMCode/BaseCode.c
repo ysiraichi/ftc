@@ -48,7 +48,7 @@ static void addStdFunctions() {
     LLVMPointerType(LLVMInt8Type(), 0)
   };
 
-  LLVMTypeRef  StrCmpType     = LLVMFunctionType(LLVMInt32Type(), StrCmpParams, 1, 0); 
+  LLVMTypeRef  StrCmpType     = LLVMFunctionType(LLVMInt32Type(), StrCmpParams, 2, 0); 
   LLVMAddFunction(Module, "strcmp", StrCmpType);
 
   /* getchar */

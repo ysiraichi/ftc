@@ -59,7 +59,7 @@ void doTypeCheck() {
   LLVMValueRef DummyRA = createDummyActivationRecord(Builder);
   addAllBaseFunctions(BaseVal, DummyRA, MainEscVars);
   LLVMValueRef MainRA = createCompleteActivationRecord(Builder, MainEscVars);
-  putRAHeadAhead(MainRA);
+  //putRAHeadAhead(MainRA);
   heapPush(MainRA);
 
   LLVMValueRef MainF = getFunctionFromBuilder(Builder);
@@ -69,7 +69,7 @@ void doTypeCheck() {
   
   translateExpr(BaseTy, BaseVal, Root);
   heapPop();
-  returnRAHead();
+  //returnRAHead();
   LLVMBuildRet(Builder, getSConstInt(0));
   LLVMDumpModule(Module);
 }

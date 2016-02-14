@@ -163,11 +163,13 @@ static void checkVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *N
   Type *ExprType  = checkExpr(TyTable, ValTable, Expr),
        *DeclType;
 
-  if (ExprType->Kind == NilTy && !TyNode) semError(1, Node, 
-      "Initializing var '%s', which is not a record, with 'nil'.", Node->Value);
-
   if (TyNode) DeclType = getTypeFromASTNode(TyTable, TyNode);
   else DeclType = ExprType;
+
+  if (ExprType->Kind == NilTy && !getRecordType(TyTable, DeclType)) semError(1, Node, 
+      "Initializing var '%s', which is not a record, with 'nil'.", Node->Value);
+
+  checkIfNilTy(ExprType, DeclType);
 
   if (typeEqual(TyTable, ExprType, DeclType))
     symTableInsertOrChange(ValTable, Node->Value, createType(DeclType->Kind, DeclType->Val)); 
