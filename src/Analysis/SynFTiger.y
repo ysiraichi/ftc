@@ -344,7 +344,7 @@ void yyerror(const char *s, ...) {
   va_list Args;
   va_start(Args, s);
 
-  printf("@[%d,%d]: ", yylloc.first_line, yylloc.first_column);
+  printf("Sintax error near position[%d,%d]: ", yylloc.first_line, yylloc.first_column);
   vprintf(s, Args);
   printf("\n");
 

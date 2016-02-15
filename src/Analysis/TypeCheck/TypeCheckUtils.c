@@ -9,7 +9,7 @@
 
 /* <function> */
 void semError(int Stop, ASTNode *Node, const char *S, ...) {
-  printf("@[%u,%u]: ", Node->Pos[0], Node->Pos[1]);
+  printf("Semantic error near position[%u,%u]: ", Node->Pos[0], Node->Pos[1]);
   va_list Args;
   va_start(Args, S);
   vprintf(S, Args);
