@@ -92,7 +92,6 @@ char *pickInsertAlias(SymbolTable *Table, const char *NodeId, void (*toBaseName)
 }
 
 LLVMValueRef getEscapedVar(SymbolTable *ValTable, char *Var, int EscapedLevel) {
-  printf("Translate: Search for '%s' with escaped level: %d.\n", Var, EscapedLevel);
   int I, Offset = findEscapedOffset(ValTable, Var, EscapedLevel);
   LLVMValueRef RA        = getHeadRA();
   LLVMValueRef RAContent = LLVMBuildLoad(Builder, RA, "");
@@ -109,7 +108,6 @@ LLVMValueRef getEscapedVar(SymbolTable *ValTable, char *Var, int EscapedLevel) {
 
   LLVMValueRef VarOffsetIdx[] = { getSConstInt(Offset) };
   LLVMValueRef EscapedVar     = LLVMBuildInBoundsGEP(Builder, EscapedVars, VarOffsetIdx, 1, "");
-  //printf("EscapedGEP: %s\n", LLVMPrintValueToString(EscapedVar));
   /*
    * Return a <type>**
    */

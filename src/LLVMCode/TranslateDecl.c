@@ -8,7 +8,6 @@ extern LLVMModuleRef  Module;
 extern LLVMBuilderRef Builder;
 
 static void translateVarDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  printf("VarDecl\n");
   PtrVector *V = &(Node->Child);
 
   ASTNode *ExprNode = (ASTNode*) ptrVectorGet(V, 1);
@@ -51,7 +50,6 @@ static LLVMTypeRef *getLLVMStructField(SymbolTable *TyTable, ASTNode *Node, int 
 }
 
 static void translateTyDeclList(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  printf("TyDeclList\n");
   PtrVectorIterator I, E;
   I = beginPtrVector(&(Node->Child));
   E = endPtrVector(&(Node->Child));
@@ -77,7 +75,6 @@ static void translateTyDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AST
 }
 
 static void translateTyDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  printf("TyDecl\n");
   int Size;
   LLVMTypeRef *Fields = getLLVMStructField(TyTable, Node, &Size);
   if (Size) {
@@ -109,7 +106,6 @@ static LLVMTypeRef *getLLVMTypesFromSeqTy(SymbolTable *St, Type *ParamType, int 
 }
 
 static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  printf("FunDeclList\n");
   PtrVectorIterator I, E;
   I = beginPtrVector(&(Node->Child));
   E = endPtrVector(&(Node->Child));
@@ -140,7 +136,6 @@ static void translateFunDeclList(SymbolTable *TyTable, SymbolTable *ValTable, AS
 }
 
 static void translateArgs(SymbolTable *ValTable, ASTNode *Node, LLVMValueRef Function) {
-  printf("Args\n");
   if (!Node) return;
 
   unsigned I;
@@ -153,11 +148,9 @@ static void translateArgs(SymbolTable *ValTable, ASTNode *Node, LLVMValueRef Fun
 
     LLVMValueRef Param     = LLVMGetParam(Function, I);
     LLVMTypeRef  ParamType = LLVMTypeOf(Param);
-    printf("Translate: Inserted parameter '%s' at %p.\n", Name, (void*) ValTable);
     symTableInsertLocal(ValTable, Name, wrapValue(Param));
 
     if (ArgType->EscapedLevel > 0) {
-      printf("Translate: Updating '%s' with 'hasEscaped':%d.\n", (char*)ArgNode->Value, ArgType->EscapedLevel);
       LLVMValueRef Wrapped    = wrapValue(Param);
       LLVMTypeRef  WrappedTy  = LLVMTypeOf(Wrapped);
       LLVMValueRef EscV       = getEscapedVar(ValTable, ArgNode->Value, ArgNode->EscapedLevel);
@@ -168,7 +161,6 @@ static void translateArgs(SymbolTable *ValTable, ASTNode *Node, LLVMValueRef Fun
 }
 
 static void translateFunDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNode *Node) {
-  printf("FunDecl\n");
   SymbolTable *TyTable_  = symTableFindChild(TyTable, Node),
               *ValTable_ = symTableFindChild(ValTable, Node);
   ASTNode *Expr    = (ASTNode*) ptrVectorGet(&(Node->Child), 2); 
@@ -186,7 +178,6 @@ static void translateFunDecl(SymbolTable *TyTable, SymbolTable *ValTable, ASTNod
   // Inserting the function name alias in the hash.
   char *Name = getAliasName(ValTable, Node->Value, &toValName);
   symTableInsertLocal(ValTable, Name, ThisClosure);
-  printf("Translate: Inserted function '%s' into %p.\n", Name, (void*)ValTable);
 
   if (FunType->EscapedLevel > 0) {
     LLVMValueRef EscVariable = getEscapedVar(ValTable, Node->Value, Node->EscapedLevel);

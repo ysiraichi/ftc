@@ -112,7 +112,6 @@ LLVMValueRef createCompleteActivationRecord(LLVMBuilderRef Builder, Hash *Escape
     Pair *P = (Pair*) ptrVectorGet(&(EscapedVars->Pairs), Count);
     LLVMValueRef ClosurePtr = (LLVMValueRef) P->second;
     if (!ClosurePtr) {
-      printf("Skipped: %s.\n", (char*)P->first);
       continue;
     }
 
